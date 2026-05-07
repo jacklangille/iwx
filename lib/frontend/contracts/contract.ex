@@ -18,6 +18,9 @@ defmodule Frontend.Contracts.Contract do
     field(:data_provider_station_mode, :string)
     field(:description, :string)
 
+    has_many(:orders, Frontend.Exchange.Order)
+    has_many(:market_snapshots, Frontend.Exchange.MarketSnapshot)
+
     timestamps()
   end
 end

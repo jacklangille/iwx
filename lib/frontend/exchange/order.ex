@@ -3,12 +3,13 @@ defmodule Frontend.Exchange.Order do
   import Ecto.Changeset
 
   schema "orders" do
-    field(:contract_id, :integer)
     field(:token_type, :string)
     field(:order_side, :string)
     field(:price, :decimal)
     field(:quantity, :integer)
     field(:status, :string)
+
+    belongs_to(:contract, Frontend.Contracts.Contract)
 
     timestamps()
   end
@@ -21,6 +22,7 @@ defmodule Frontend.Exchange.Order do
     |> validate_inclusion(:order_side, ["bid", "ask"])
     |> validate_number(:price, greater_than: 0)
     |> validate_number(:quantity, greater_than: 0)
+    |> foreign_key_constraint(:contract_id)
     |> put_change(:status, "open")
   end
 end

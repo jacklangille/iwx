@@ -1,7 +1,7 @@
 defmodule FrontendWeb.MarketChannel do
   use Phoenix.Channel
 
-  alias Frontend.Exchange
+  alias Frontend.Contracts
 
   @impl true
   def join("contract:" <> contract_id, _payload, socket) do
@@ -21,7 +21,7 @@ defmodule FrontendWeb.MarketChannel do
       Integer.to_string(id) != contract_id ->
         {:error, %{reason: "invalid_contract"}}
 
-      Exchange.contract_exists?(id) ->
+      Contracts.contract_exists?(id) ->
         {:ok, assign(socket, :contract_id, id)}
 
       true ->

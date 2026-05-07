@@ -3,24 +3,18 @@ defmodule FrontendWeb.OrderController do
 
   alias Frontend.Exchange
   alias Frontend.Exchange.Order
+  alias FrontendWeb.MarketBroadcaster
+  alias FrontendWeb.OrderJSON
 
   def create(conn, params) do
     case Exchange.place_order(params) do
       {:ok, %Order{} = order} ->
-        json(conn, %{
-          id: order.id,
-          contract_id: order.contract_id,
-          token_type: order.token_type,
-          order_side: order.order_side,
-          price: Decimal.to_string(order.price, :normal),
-          quantity: order.quantity,
-          status: order.status
-        })
+        MarketBroadcaster.broadcast_market_state(order.contract_id)
+        json(conn, OrderJSON.show(%{order: order}))
 
       {:ok, %{status: "filled"}} ->
-        json(conn, %{
-          status: "filled"
-        })
+        MarketBroadcaster.broadcast_market_state(params["contract_id"])
+        json(conn, OrderJSON.show(%{order: %{status: "filled"}}))
 
       {:error, changeset} ->
         conn
@@ -34,19 +28,6 @@ defmodule FrontendWeb.OrderController do
   def index(conn, params) do
     orders = Exchange.list_orders(params)
 
-    json(
-      conn,
-      Enum.map(orders, fn order ->
-        %{
-          id: order.id,
-          contract_id: order.contract_id,
-          token_type: order.token_type,
-          order_side: order.order_side,
-          price: Decimal.to_string(order.price, :normal),
-          quantity: order.quantity,
-          status: order.status
-        }
-      end)
-    )
+    json(conn, OrderJSON.index(%{orders: orders}))
   end
 end

@@ -1,4 +1,6 @@
 defmodule FrontendWeb.MarketStateJSON do
+  alias FrontendWeb.NumberJSON
+
   def serialize(market_state) do
     %{
       contract_id: market_state.contract_id,
@@ -17,20 +19,20 @@ defmodule FrontendWeb.MarketStateJSON do
       summary: %{
         best: %{
           above: %{
-            bid: number_to_string(market_state.summary.best.above.bid),
-            ask: number_to_string(market_state.summary.best.above.ask)
+            bid: NumberJSON.number_to_string(market_state.summary.best.above.bid),
+            ask: NumberJSON.number_to_string(market_state.summary.best.above.ask)
           },
           below: %{
-            bid: number_to_string(market_state.summary.best.below.bid),
-            ask: number_to_string(market_state.summary.best.below.ask)
+            bid: NumberJSON.number_to_string(market_state.summary.best.below.bid),
+            ask: NumberJSON.number_to_string(market_state.summary.best.below.ask)
           }
         },
         mid: %{
-          above: number_to_string(market_state.summary.mid.above),
-          below: number_to_string(market_state.summary.mid.below)
+          above: NumberJSON.number_to_string(market_state.summary.mid.above),
+          below: NumberJSON.number_to_string(market_state.summary.mid.below)
         },
         liquidity: market_state.summary.liquidity,
-        above_below_bid_gap: number_to_string(market_state.summary.above_below_bid_gap)
+        above_below_bid_gap: NumberJSON.number_to_string(market_state.summary.above_below_bid_gap)
       }
     }
   end
@@ -41,16 +43,16 @@ defmodule FrontendWeb.MarketStateJSON do
     %{
       bucket_start: timestamp_to_string(chart_point.bucket_start),
       inserted_at: timestamp_to_string(chart_point.inserted_at),
-      mid_above: number_to_string(chart_point.mid_above),
-      mid_below: number_to_string(chart_point.mid_below),
-      best_above: number_to_string(chart_point.best_above),
-      best_below: number_to_string(chart_point.best_below)
+      mid_above: NumberJSON.number_to_string(chart_point.mid_above),
+      mid_below: NumberJSON.number_to_string(chart_point.mid_below),
+      best_above: NumberJSON.number_to_string(chart_point.best_above),
+      best_below: NumberJSON.number_to_string(chart_point.best_below)
     }
   end
 
   defp serialize_level(level) do
     %{
-      price: number_to_string(level.price),
+      price: NumberJSON.number_to_string(level.price),
       quantity: level.quantity
     }
   end
@@ -58,12 +60,4 @@ defmodule FrontendWeb.MarketStateJSON do
   defp timestamp_to_string(nil), do: nil
   defp timestamp_to_string(%NaiveDateTime{} = value), do: NaiveDateTime.to_iso8601(value)
   defp timestamp_to_string(%DateTime{} = value), do: DateTime.to_iso8601(value)
-
-  defp number_to_string(nil), do: nil
-  defp number_to_string(%Decimal{} = value), do: Decimal.to_string(value, :normal)
-
-  defp number_to_string(value) when is_float(value),
-    do: :erlang.float_to_binary(value, decimals: 2)
-
-  defp number_to_string(value) when is_integer(value), do: Integer.to_string(value)
 end
