@@ -1,7 +1,9 @@
 .order-book {
   display: flex;
   flex-direction: column;
-  height: var(--height-order-book);
+  flex: 1 1 0;
+  height: auto;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -68,7 +70,7 @@
 }
 
 #order-book-list {
-  flex: 1;
+  flex: 1 1 0;
   overflow-y: auto;
   overflow-x: hidden;
   min-height: 0;

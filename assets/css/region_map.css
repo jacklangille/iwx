@@ -1,4 +1,5 @@
 .panel--region-map {
+  width: 75%;
   gap: 0;
   padding: 0;
   border-width: 0 0 1px;
@@ -23,6 +24,7 @@
   font-weight: var(--font-weight-normal);
   line-height: var(--line-height-md);
 }
+
 .region-map__canvas {
   position: relative;
   height: var(--height-region-map);

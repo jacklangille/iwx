@@ -14,6 +14,7 @@ defmodule FrontendWeb.Router do
     pipe_through :browser
 
     get "/", PageController, :home
+    get "/stations", StationExplorerController, :index
   end
 
   scope "/api", FrontendWeb do

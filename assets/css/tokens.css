@@ -66,8 +66,7 @@
   --height-chart: clamp(340px, 46vh, 430px);
   --height-chart-mobile: 280px;
   --height-order-book: 320px;
-  --height-region-map: 220px;
-  --height-region-map-mobile: 140px;
+  --height-region-map: 540px;
   --height-right-rail-control: 26px;
   --height-form-input: 32px;
   --height-submit-button: 32px;
