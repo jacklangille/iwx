@@ -1,0 +1,32 @@
+# macOS and editor files
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Elixir/Phoenix build artifacts and local tooling state
+/_build/
+/deps/
+/.elixir_ls/
+/.fetch
+erl_crash.dump
+*.ez
+
+# Node dependencies and generated assets
+/assets/node_modules/
+/priv/static/assets/
+
+# Local environment and runtime files
+.env
+.env.*
+!.env.example
+/tmp/
+/log/
+
+# Test and coverage output
+/cover/
+/coverage/
+
+# Local uploads or generated files
+/priv/static/uploads/

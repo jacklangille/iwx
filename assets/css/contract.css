@@ -1,0 +1,51 @@
+.market-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--height-status-pill);
+  padding: 0 var(--space-sm);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-body-sm);
+  line-height: var(--line-height-sm);
+  white-space: nowrap;
+}
+
+.market-status--open {
+  background: var(--color-status-positive-bg);
+  color: var(--color-status-positive);
+}
+
+.market-status--resolving {
+  background: var(--color-status-warning-bg);
+  color: var(--color-status-warning);
+}
+
+.market-status--closed {
+  background: var(--color-status-negative-bg);
+  color: var(--color-status-negative);
+}
+
+.market-meta-rail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--space-sm) / 2) 0;
+  margin: var(--space-sm) 0 var(--space-md);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-sm);
+}
+
+.market-meta-rail__item {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--height-status-pill);
+}
+
+.market-meta-rail__item::before {
+  content: "";
+  width: var(--border-width-default);
+  height: calc(var(--space-lg) - calc(var(--space-sm) / 2));
+  margin: 0 var(--space-md);
+  background: var(--color-border-default);
+}

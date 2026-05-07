@@ -1,0 +1,226 @@
+/* =========================================================
+   Foundations / base
+   ========================================================= */
+:root {
+  --font-family-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
+
+  /* =========================================================
+     Typography
+     ========================================================= */
+  --font-size-map-attribution: 8px;
+  --font-size-chart-control-mobile: 10px;
+  --font-size-caption: 10px;
+  --font-size-body-sm: 11px;
+  --font-size-body: 12px;
+  --font-size-brand: 1.25rem;
+  --font-size-section-title: 13px;
+  --font-size-belief-label: 13px;
+  --font-size-control-lg: 14px;
+  --font-size-market-title: 18px;
+
+  --line-height-sm: 1;
+  --line-height-md: 1.15;
+  --line-height-lg: 1.35;
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-bold: 700;
+
+  --letter-spacing-none: 0;
+  --letter-spacing-ui: 0.01em;
+  --letter-spacing-label: 0.04em;
+  --letter-spacing-table-heading: 0.05em;
+
+  /* =========================================================
+     Spacing
+     ========================================================= */
+  --space-sm: 4px;
+  --space-md: 6px;
+  --space-lg: 12px;
+
+  --space-page-top: 12px;
+  --space-page-bottom: 12px;
+  --space-shell-gutter: 16px;
+  --space-shell-inner-x: 12px;
+  --space-topbar-padding-top: 8px;
+  --space-topbar-padding-bottom: 6px;
+  --space-panel-padding: 12px;
+  --space-right-rail-stack: 8px;
+  --space-right-rail-half: calc(var(--space-right-rail-stack) / 2);
+
+  /* =========================================================
+     Layout
+     ========================================================= */
+  --width-app-min: 1024px;
+  --width-content-shell: 1440px;
+  --width-right-rail: 300px;
+  --width-order-book-panel: 50%;
+  --width-submit-button: 180px;
+  --width-market-description: 680px;
+
+  --control-height-sm: 20px;
+  --control-height-md: 28px;
+  --control-height-lg: 34px;
+
+  --height-chart: clamp(340px, 46vh, 430px);
+  --height-chart-mobile: 280px;
+  --height-order-book: 320px;
+  --height-region-map: 220px;
+  --height-region-map-mobile: 140px;
+  --height-right-rail-control: 26px;
+  --height-form-input: 32px;
+  --height-submit-button: 32px;
+  --height-status-pill: 20px;
+  --height-chart-top-chrome: 34px;
+  --height-chart-top-chrome-mobile: 60px;
+  --height-chart-status-strip: 22px;
+  --height-chart-status-strip-mobile: 36px;
+
+  --min-height-book-panel: 220px;
+  --min-width-mode-selector: 74px;
+  --min-width-form-control-column: 84px;
+  --min-width-chart-control: 26px;
+  --min-width-chart-marker: 40px;
+  --height-chart-marker: 18px;
+
+  /* =========================================================
+     Borders / radius
+     ========================================================= */
+  --border-width-none: 0;
+  --border-width-default: 1px;
+  --border-width-active: 2px;
+
+  --radius-none: 0;
+  --radius-sm: 3px;
+  --radius-md: 6px;
+  --radius-lg: 12px;
+  --radius-pill: 9999px;
+
+  /* =========================================================
+     Surfaces
+     ========================================================= */
+  --color-bg-page: #ffffff;
+  --color-surface-default: #ffffff;
+  --color-surface-muted: #f9fafb;
+  --color-surface-control-muted: #f3f4f6;
+  --color-surface-transparent: transparent;
+  --color-surface-chart-base: #f9fafb00;
+  --color-surface-chart-wash-start: rgba(249, 250, 251, 0.92);
+  --color-surface-chart-wash-end: rgba(255, 255, 255, 0.98);
+  --color-surface-chart-chrome: rgba(255, 255, 255, 0.88);
+  --color-surface-chart-status: rgba(255, 255, 255, 0.84);
+  --color-surface-chart-control-group: rgba(249, 250, 251, 0.82);
+  --color-surface-chart-control-hover: rgba(17, 24, 39, 0.06);
+  --color-overlay-transparent: rgba(0, 0, 0, 0);
+  --color-disabled-placeholder: rgba(107, 114, 128, 0.52);
+
+  /* =========================================================
+     Text
+     ========================================================= */
+  --color-text-primary: #000000;
+  --color-text-muted: #6d6d6e;
+  --color-text-inverse: #ffffff;
+
+  /* =========================================================
+     Borders / dividers
+     ========================================================= */
+  --color-border-default: #cdcdcd;
+  --color-border-muted: #e5e7eb;
+  --color-border-warm-subtle: #efebe5;
+  --color-border-warm: #ebe6df;
+  --color-border-warm-strong: #e4ddd4;
+  --color-border-control-soft: #e7e1d9;
+  --color-border-interactive-active: #c8cacc;
+  --color-border-chart-axis: rgba(107, 114, 128, 0.18);
+
+  /* =========================================================
+     Brand / accents
+     ========================================================= */
+  --color-brand-accent: #000000A1;
+  --color-brand-accent-border: #000000A1;
+  --color-brand-accent-text: #ffffff;
+  --color-focus-ring: rgba(17, 24, 39, 0.22);
+
+  /* =========================================================
+     Status colors
+     ========================================================= */
+  --color-status-positive: #16a34a;
+  --color-status-positive-soft: rgba(31, 166, 125, 0.75);
+  --color-status-positive-bg: rgba(22, 163, 74, 0.12);
+  --color-status-positive-hover: rgba(22, 163, 74, 0.045);
+  --color-status-positive-flash: rgba(22, 163, 74, 0.24);
+
+  --color-status-negative: #dc2626;
+  --color-status-negative-soft: rgba(237, 112, 136, 0.75);
+  --color-status-negative-bg: rgba(220, 38, 38, 0.12);
+  --color-status-negative-hover: rgba(220, 38, 38, 0.045);
+  --color-status-negative-flash: rgba(220, 38, 38, 0.2);
+
+  --color-status-warning: #b45309;
+  --color-status-warning-bg: rgba(245, 158, 11, 0.15);
+
+  /* =========================================================
+     Chart tokens
+     ========================================================= */
+  --color-chart-above: #44607f;
+  --color-chart-below: #b8924a;
+  --color-chart-grid: rgba(107, 114, 128, 0.08);
+  --color-chart-guide: rgba(17, 24, 39, 0.22);
+  --color-chart-anchor-stroke: rgba(255, 255, 255, 0.92);
+  --color-chart-marker-text: #ffffff;
+  --shadow-chart-control-active: 0 1px 2px rgba(17, 24, 39, 0.12);
+
+  /* =========================================================
+     Order book tokens
+     ========================================================= */
+  --color-orderbook-bid: var(--color-status-positive);
+  --color-orderbook-bid-depth: var(--color-status-positive-soft);
+  --color-orderbook-bid-hover: var(--color-status-positive-hover);
+  --color-orderbook-bid-flash: var(--color-status-positive-flash);
+  --color-orderbook-ask: var(--color-status-negative);
+  --color-orderbook-ask-depth: var(--color-status-negative-soft);
+  --color-orderbook-ask-hover: var(--color-status-negative-hover);
+  --color-orderbook-ask-flash: var(--color-status-negative-flash);
+  --color-orderbook-spread-edge: rgba(17, 24, 39, 0.025);
+  --color-orderbook-spread-center: rgba(17, 24, 39, 0.05);
+
+  /* =========================================================
+     Map tokens
+     ========================================================= */
+  --color-map-water: #4e5459;
+  --color-map-land: #747a80;
+  --color-map-road: #d0d4d8;
+  --color-map-label: #dbdee1;
+  --color-map-label-halo: rgba(0, 0, 0, 0);
+  --color-map-attribution-bg: rgba(255, 255, 255, 0.42);
+  --color-map-attribution-text: rgba(17, 24, 39, 0.34);
+  --color-map-attribution-text-hover: rgba(17, 24, 39, 0.5);
+
+  /* =========================================================
+     Elevation / visual effects
+     ========================================================= */
+  --shadow-panel: none;
+  --shadow-subtle: 0 1px 2px rgba(16, 24, 40, 0.04);
+  --blur-chart-chrome: blur(10px);
+
+  /* =========================================================
+     Motion
+     ========================================================= */
+  --duration-fast: 120ms;
+  --duration-default: 160ms;
+  --duration-width: 180ms;
+  --duration-map-ease: 420ms;
+  --duration-orderbook-flash: 700ms;
+  --easing-standard: ease;
+  --easing-out: ease-out;
+
+  /* =========================================================
+     Z-index
+     ========================================================= */
+  --z-base: 0;
+  --z-shell-rule: 1;
+  --z-rail-rule: 2;
+  --z-map-attribution: 2;
+  --z-chart-chrome: 10;
+}

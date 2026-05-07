@@ -1,0 +1,182 @@
+<div class="app-shell">
+  <header class="topbar">
+    <div class="topbar__inner">
+      <div class="topbar__row topbar__row--primary">
+        <div class="brand" aria-label="IWX">
+          <span class="brand__line">IWX</span>
+        </div>
+
+        <nav class="topnav" aria-label="Market categories">
+          <button class="topnav__item" type="button">Trade</button>
+          <button class="topnav__item" type="button">Portfolio</button>
+          <button class="topnav__item" type="button">Markets</button>
+          <button class="topnav__item" type="button">Documentation</button>
+        </nav>
+
+        <div class="topbar__actions">
+          <button class="topbar__login" type="button">Log in</button>
+          <button class="topbar__signup" type="button">Sign Up</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="page">
+    <section class="exchange-grid">
+      <section class="panel--market-header">
+        <div class="market-header">
+          <h1 class="market-header__title" id="contract-title"></h1>
+
+          <div class="market-meta-rail" aria-label="Contract metadata">
+            <span id="market-status-badge" class="market-status market-status--open">
+              Open
+            </span>
+            <span class="market-meta-rail__item" id="contract-threshold">Threshold</span>
+            <span class="market-meta-rail__item" id="market-trading-period">
+              Trading Apr 1 – Jul 27, 2026
+            </span>
+            <span class="market-meta-rail__item" id="market-measurement-period">
+              Measurement Jul 1 – Jul 31, 2026
+            </span>
+            <span class="market-meta-rail__item" id="contract-data-provider">-</span>
+          </div>
+
+          <div class="market-header__description" id="contract-description"></div>
+        </div>
+      </section>
+
+      <div class="market-main">
+        <div class="panel--chart">
+          <div class="chart-shell">
+            <canvas id="chart-canvas"></canvas>
+          </div>
+        </div>
+
+        <section class="panel panel--region-map">
+          <div class="region-map__header">
+            <h2 class="region-map__title">Region Map</h2>
+          </div>
+
+          <div class="region-map__canvas">
+            <div id="region-map"></div>
+          </div>
+        </section>
+      </div>
+
+      <aside class="panel--right-rail" aria-label="Market order entry">
+        <section
+          class="right-rail-section right-rail-section--order"
+          aria-labelledby="place-order-heading"
+        >
+          <div class="right-rail-section__header">
+            <h2 class="right-rail-section__title" id="place-order-heading">Trade</h2>
+          </div>
+
+          <div class="right-rail-section__body">
+            <div class="trade-panel__body">
+              <div class="trade-panel__top-row">
+                <div class="action-selector" id="action-selector" aria-label="Order action">
+                  <button
+                    type="button"
+                    class="action-selector__option action-selector__option--active"
+                    data-action="bid"
+                  >
+                    Buy
+                  </button>
+
+                  <button
+                    type="button"
+                    class="action-selector__option"
+                    data-action="ask"
+                  >
+                    Sell
+                  </button>
+                </div>
+              </div>
+
+              <div class="order-entry-form">
+                <div class="order-entry-form__inputs">
+                  <label class="order-entry-field order-entry-field--price" for="order-price">
+                    <span class="order-entry-field__label">Price</span>
+                    <span class="order-entry-field__control order-entry-field__control--currency">
+                      <span class="order-entry-field__prefix" aria-hidden="true">$</span>
+                      <input id="order-price" type="number" placeholder="0.00" />
+                    </span>
+                  </label>
+                  <label
+                    class="order-entry-field order-entry-field--quantity"
+                    for="order-quantity"
+                  >
+                    <span class="order-entry-field__label">Quantity</span>
+                    <span class="order-entry-field__control order-entry-field__control--split">
+                      <input id="order-quantity" type="number" placeholder="0" />
+                      <select
+                        id="order-belief"
+                        class="order-entry-field__select"
+                        aria-label="Order side"
+                      >
+                        <option value="above" selected>Above</option>
+                        <option value="below">Below</option>
+                      </select>
+                    </span>
+                  </label>
+                </div>
+
+                <button id="order-submit" type="button">Submit Buy Above</button>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section
+          class="right-rail-section right-rail-section--mint"
+          aria-labelledby="mint-heading"
+        >
+          <div class="right-rail-section__header">
+            <h2 class="right-rail-section__title" id="mint-heading">Provide Liquidity</h2>
+          </div>
+
+          <div class="right-rail-section__body">
+            <div class="mint-panel">
+              <div class="mint-panel__form">
+                <label class="mint-panel__field" for="mint-quantity">
+                  <span class="mint-panel__label">Quantity</span>
+                  <input id="mint-quantity" type="number" placeholder="0" />
+                </label>
+
+                <button id="mint-submit" type="button">Mint 0 Pairs</button>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section
+          class="right-rail-section right-rail-section--book"
+          aria-labelledby="order-book-heading"
+        >
+          <div class="right-rail-section__header right-rail-section__header--with-control">
+            <h2 class="right-rail-section__title" id="order-book-heading">Order Book</h2>
+            <select
+              id="order-book-view"
+              class="order-book-view-select"
+              aria-label="Order book view"
+            >
+              <option value="above" selected>Above</option>
+              <option value="below">Below</option>
+            </select>
+          </div>
+
+          <div class="right-rail-section__body">
+            <div class="order-book">
+              <div class="order-book__header">
+                <span>Price</span>
+                <span>Size</span>
+                <span>Total</span>
+              </div>
+
+              <div id="order-book-list"></div>
+            </div>
+          </div>
+        </section>
+      </aside>
+    </section>
+  </main>
+</div>

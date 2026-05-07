@@ -1,0 +1,278 @@
+#chart-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  position: relative;
+  z-index: var(--z-base);
+}
+
+.chart-shell {
+  position: relative;
+  height: var(--height-chart);
+  min-height: 0;
+  border-radius: var(--radius-none);
+  border: var(--border-width-none);
+  background:
+    linear-gradient(
+      180deg,
+      var(--color-surface-chart-wash-start),
+      var(--color-surface-chart-wash-end)
+    ),
+    var(--color-surface-chart-base);
+  overflow: hidden;
+}
+
+.chart-shell--enhanced {
+  isolation: isolate;
+}
+
+.chart-top-chrome,
+.chart-status-strip {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: var(--z-chart-chrome);
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+}
+
+.chart-top-chrome {
+  top: 0;
+  gap: var(--space-md);
+  min-height: var(--height-chart-top-chrome);
+  padding: 0 var(--space-md);
+  border-bottom: var(--border-width-default) solid var(--color-border-warm);
+  background: var(--color-surface-chart-chrome);
+  backdrop-filter: var(--blur-chart-chrome);
+  pointer-events: auto;
+}
+
+.chart-market-readout {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--space-md) + var(--space-sm));
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.chart-market-readout__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+  height: var(--control-height-sm);
+  font-size: var(--font-size-body-sm);
+  line-height: var(--line-height-sm);
+  white-space: nowrap;
+}
+
+.chart-market-readout__series {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-height-sm);
+}
+
+.chart-market-readout__series::before {
+  width: calc(var(--space-lg) - var(--space-sm));
+  height: calc(var(--space-sm) / 2);
+  border-radius: var(--radius-pill);
+  content: "";
+}
+
+.chart-market-readout__series--above::before {
+  background: var(--color-chart-above-active);
+}
+
+.chart-market-readout__series--below::before {
+  background: var(--color-chart-below-active);
+}
+
+.chart-market-readout__value {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-body-sm);
+  font-weight: var(--font-weight-normal);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--line-height-sm);
+}
+
+.chart-market-readout__change {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-body-sm);
+  font-weight: var(--font-weight-normal);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--line-height-sm);
+}
+
+.chart-market-readout__change--positive {
+  color: var(--color-status-positive);
+}
+
+.chart-market-readout__change--negative {
+  color: var(--color-status-negative);
+}
+
+.chart-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  flex: 0 0 auto;
+  pointer-events: auto;
+}
+
+.chart-control-group {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 1px;
+  border: var(--border-width-default) solid var(--color-border-warm-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-chart-control-group);
+}
+
+.chart-control-button {
+  min-width: var(--min-width-chart-control);
+  height: var(--control-height-sm);
+  padding: 0 var(--space-sm);
+  border: var(--border-width-none);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-transparent);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-height-sm);
+  transition:
+    background-color var(--duration-fast) var(--easing-standard),
+    color var(--duration-fast) var(--easing-standard),
+    box-shadow var(--duration-fast) var(--easing-standard);
+}
+
+.chart-control-button:hover {
+  background: var(--color-surface-chart-control-hover);
+  color: var(--color-text-primary);
+}
+
+.chart-control-button--active {
+  background: var(--color-text-primary);
+  color: var(--color-text-inverse);
+  box-shadow: var(--shadow-chart-control-active);
+}
+
+.chart-status-strip {
+  bottom: 0;
+  justify-content: space-between;
+  gap: var(--space-md);
+  min-height: var(--height-chart-status-strip);
+  padding: 0 var(--space-md);
+  border-top: var(--border-width-default) solid var(--color-border-warm);
+  background: var(--color-surface-chart-status);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-height-md);
+  backdrop-filter: var(--blur-chart-chrome);
+}
+
+.chart-status-strip__time,
+.chart-status-strip__meta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chart-status-strip__time {
+  color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-status-strip__meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-md);
+  flex: 0 1 auto;
+}
+
+@media (max-width: 860px) {
+  .chart-shell {
+    height: var(--height-chart-mobile);
+  }
+
+  .chart-top-chrome {
+    gap: var(--space-md);
+    min-height: var(--height-chart-top-chrome);
+  }
+
+  .chart-market-readout {
+    flex: 1 1 auto;
+  }
+
+  .chart-controls {
+    flex: 0 0 auto;
+  }
+}
+
+@media (max-width: 560px) {
+  .chart-top-chrome {
+    align-items: flex-start;
+    flex-direction: column;
+    justify-content: center;
+    gap: var(--space-sm);
+    min-height: var(--height-chart-top-chrome-mobile);
+    padding: var(--space-sm) var(--space-md);
+  }
+
+  .chart-market-readout {
+    width: 100%;
+    gap: var(--space-md);
+  }
+
+  .chart-controls {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .chart-control-button {
+    padding: 0 var(--space-sm);
+    font-size: var(--font-size-chart-control-mobile);
+  }
+
+  .chart-status-strip {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: calc(var(--space-sm) / 2);
+    min-height: var(--height-chart-status-strip-mobile);
+  }
+
+  .chart-status-strip__meta {
+    justify-content: flex-start;
+  }
+}
+
+.market-header {
+  margin: 0;
+  padding-bottom: var(--space-sm);
+}
+
+.market-header__title {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--font-size-market-title);
+  line-height: var(--line-height-md);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--letter-spacing-ui);
+}
+
+.market-header__description {
+  max-width: var(--width-market-description);
+  font-size: var(--font-size-section-title);
+  line-height: var(--line-height-lg);
+  color: var(--color-text-muted);
+}
