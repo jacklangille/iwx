@@ -112,6 +112,7 @@ type OracleObservation struct {
 
 type ContractResolution struct {
 	ID                     int64
+	EventID                string
 	ContractID             int64
 	ProviderName           string
 	StationID              string
@@ -122,6 +123,7 @@ type ContractResolution struct {
 	ResolvedValue          string
 	Outcome                ResolutionOutcome
 	ResolvedAt             time.Time
+	PublishedAt            *time.Time
 }
 
 type SettlementEntry struct {

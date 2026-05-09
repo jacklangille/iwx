@@ -128,11 +128,11 @@ func (s *Server) handleContractCollateralLockCreate(w http.ResponseWriter, r *ht
 	}
 
 	log.Printf("exchange-core contract collateral_locked contract_id=%d user_id=%d lock_id=%d paired_quantity=%d", contractID, userID, result.Lock.ID, request.PairedQuantity)
-	writeJSON(w, http.StatusCreated, map[string]any{
-		"requirement":     serializeCollateralRequirement(result.Requirement),
-		"collateral_lock": serializeCollateralLock(result.Lock),
-		"account":         serializeCashAccount(result.Account),
-		"ledger_entry":    serializeLedgerEntry(result.LedgerEntry),
+	writeJSON(w, http.StatusCreated, contractCollateralLockMutationResponse{
+		Requirement:    serializeCollateralRequirement(result.Requirement),
+		CollateralLock: serializeCollateralLock(result.Lock),
+		Account:        serializeCashAccount(result.Account),
+		LedgerEntry:    ptrLedgerEntryResponse(serializeLedgerEntry(result.LedgerEntry)),
 	})
 }
 
@@ -171,10 +171,10 @@ func (s *Server) handleContractIssuanceBatchCreate(w http.ResponseWriter, r *htt
 	}
 
 	log.Printf("exchange-core issuance_batch_created contract_id=%d user_id=%d batch_id=%d collateral_lock_id=%d paired_quantity=%d", contractID, userID, details.Batch.ID, request.CollateralLockID, request.PairedQuantity)
-	writeJSON(w, http.StatusCreated, map[string]any{
-		"issuance_batch":  serializeIssuanceBatch(details.Batch),
-		"collateral_lock": serializeCollateralLock(details.Lock),
-		"positions":       serializePositions(details.Positions),
+	writeJSON(w, http.StatusCreated, issuanceBatchMutationResponse{
+		IssuanceBatch:  serializeIssuanceBatch(details.Batch),
+		CollateralLock: serializeCollateralLock(details.Lock),
+		Positions:      serializePositions(details.Positions),
 	})
 }
 

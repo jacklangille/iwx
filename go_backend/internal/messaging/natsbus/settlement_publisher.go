@@ -49,7 +49,7 @@ func (p *SettlementPublisher) PublishSettlementCompleted(ctx context.Context, ev
 	if err != nil {
 		return err
 	}
-	_, err = p.js.Publish(p.subject, body)
+	_, err = p.js.Publish(p.subject, body, nats.MsgId(event.EventID))
 	if err == nil {
 		logging.Info(ctx, "settlement_completed_published", "contract_id", event.ContractID, "subject", p.subject)
 	}

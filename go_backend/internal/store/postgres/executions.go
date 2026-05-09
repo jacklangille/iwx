@@ -20,6 +20,7 @@ func (r *ExecutionRepository) ListExecutions(ctx context.Context, contractID int
 		SELECT
 			id,
 			execution_id,
+			command_id,
 			contract_id,
 			token_type,
 			buy_order_id,
@@ -74,6 +75,7 @@ func (r *ExecutionRepository) ReplaceExecutionsProjection(ctx context.Context, c
 				INSERT INTO executions (
 					id,
 					execution_id,
+					command_id,
 					contract_id,
 					token_type,
 					buy_order_id,
@@ -86,10 +88,11 @@ func (r *ExecutionRepository) ReplaceExecutionsProjection(ctx context.Context, c
 					quantity,
 					occurred_at
 				)
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 			`,
 				execution.ID,
 				execution.ExecutionID,
+				execution.CommandID,
 				execution.ContractID,
 				execution.TokenType,
 				execution.BuyOrderID,

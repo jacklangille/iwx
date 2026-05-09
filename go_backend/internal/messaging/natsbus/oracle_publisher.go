@@ -52,7 +52,7 @@ func (p *OraclePublisher) PublishContractResolved(ctx context.Context, event eve
 		return err
 	}
 
-	_, err = p.js.Publish(p.subject, body)
+	_, err = p.js.Publish(p.subject, body, nats.MsgId(event.EventID))
 	if err == nil {
 		logging.Info(ctx, "oracle_contract_resolved_published", "contract_id", event.ContractID, "outcome", event.Outcome, "subject", p.subject)
 	}

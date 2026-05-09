@@ -9,9 +9,11 @@ The current frontend lives separately in [ui/](/C:/Users/willj/src/iwx/ui) as a 
 - `cmd/auth`
   - login and JWT issuance
 - `cmd/read-api`
-  - public/private read APIs and order submission
+  - public/private read APIs
+- `cmd/projector`
+  - consumes projection change events and writes `read-db`
 - `cmd/exchange-core`
-  - contract metadata and lifecycle ownership
+  - contract metadata, lifecycle, balances, reservations, and order submission
 - `cmd/matcher`
   - asynchronous order matcher over NATS JetStream
 - `cmd/oracle`
@@ -36,7 +38,6 @@ Read API:
 - `GET /api/contracts/:id/resolution`
 - `GET /api/contracts/:id/settlements`
 - `GET /api/orders`
-- `POST /api/orders` (authenticated)
 - `GET /api/order_commands/:command_id` (authenticated owner only)
 - `GET /api/me/account` (authenticated)
 - `GET /api/me/positions` (authenticated)
@@ -45,9 +46,6 @@ Read API:
 - `GET /api/me/cash_reservations` (authenticated)
 - `GET /api/me/portfolio` (authenticated)
 - `GET /api/me/settlements` (authenticated)
-- `GET /api/stream/contracts/:id/market`
-- `GET /api/stream/me/order_commands/:id` (authenticated)
-- `GET /api/stream/me/portfolio` (authenticated)
 
 Exchange-core API:
 
@@ -63,6 +61,7 @@ Exchange-core API:
 - `POST /api/accounts/cash_reservations/:id/release` (authenticated owner only)
 - `GET /api/positions/me` (authenticated)
 - `GET /api/positions/me/locks` (authenticated)
+- `POST /api/orders` (authenticated)
 - `POST /api/contracts` (authenticated)
 - `GET /api/contracts/:id` (authenticated owner only)
 - `POST /api/contracts/:id/submit_for_approval` (authenticated owner only)
@@ -98,9 +97,10 @@ Implemented so far:
 - Phase 7 issuance batches and creator position credits
 - Phase 8 reservation-aware order intake
 - Phase 9 matcher executions and idempotent command replay
-- Phase 10 read-db user projections, hot market caching, and SSE delivery
+- Phase 10 read-db user projections and hot market caching
 - Phase 11 oracle observations, deterministic resolution, and contract-resolved events
 - Phase 12 settlement consumption, payouts/refunds, and settlement history projections
+- Phase 16 item 2 dedicated projector service for `read-db`
 
 Current auth behavior:
 
@@ -151,16 +151,18 @@ Current matcher execution behavior:
 - each fill creates an `execution` row owned by the matcher
 - matcher publishes `execution_created` events after successful fills
 - exchange-core consumes execution events to debit reserved buyer cash, credit seller cash, debit seller locked inventory, and credit buyer positions
-- read-api consumes execution events to refresh market projections from matcher storage into `read-db`
+- matcher also emits `market_changed` and `order_command_changed` projection-change events
 - duplicate JetStream deliveries are short-circuited by `command_id` replay instead of rematching the order
 
 Current read-model behavior:
 
 - `read-db` now stores user cash accounts, positions, position locks, collateral locks, and cash reservations
-- exchange-core mutations project user state into `read-db`
-- read-api serves authenticated portfolio/dashboard reads from `read-db` instead of reaching back into exchange-core
+- a dedicated `projector` service is now the only writer to `read-db`
+- exchange-core, matcher, oracle, and settlement emit business `projection_change` events
+- projector consumes those events, fetches authoritative bundles over internal HTTP, and updates `read-db`
+- read-api serves authenticated portfolio/dashboard reads from `read-db` without consuming NATS or touching owner databases
 - hot market reads use a short-lived in-memory cache inside `read-api`
-- read-api exposes polling-based SSE endpoints for market, command, and portfolio updates
+- the React UI polls the normal JSON endpoints directly for market, command, and portfolio freshness
 
 Current oracle behavior:
 
@@ -186,13 +188,13 @@ Local services are defined in [docker-compose.yml](/C:/Users/willj/src/iwx/docke
 - `read-postgres`
 - `exchange-core-postgres`
 - `oracle-postgres`
-- `matcher-postgres-0`
-- `matcher-postgres-1`
+- `matcher-postgres`
 - `auth-postgres`
 - `nats`
 - `auth`
 - `exchange-core`
 - `read-api`
+- `projector`
 - `matcher`
 - `oracle`
 - `settlement`
@@ -237,6 +239,8 @@ Useful env vars:
 - `IWX_MATCHER_PARTITION_COUNT`
 - `IWX_MATCHER_OWNED_PARTITIONS`
 - `IWX_MATCHER_INSTANCE_ID`
+- `IWX_MATCHER_HTTP_ADDR`
+- `IWX_MATCHER_SERVICE_URL`
 - `IWX_NATS_STREAM_PLACE_ORDER`
 - `IWX_NATS_SUBJECT_PLACE_ORDER`
 
@@ -257,16 +261,17 @@ Useful env vars:
   - order cash reservations
 - read DB
   - query projections for contracts, orders, executions, snapshots, order command status, cash accounts, and portfolio state
-- matcher primary DB
-  - matcher-owned write path for orders, executions, snapshots, and command state
-- matcher replica DB
-  - debugging and verification path only
+- projector worker
+  - the only process allowed to write `read-db`
+- matcher DB
+  - matcher-owned local development database for orders, executions, snapshots, command state, and outbox events
 
 ## Configuration Boundary
 
 - `IWX_AUTH_DATABASE_URL` is required for `auth`
 - `IWX_EXCHANGE_CORE_DATABASE_URL` is required for `exchange-core`
 - `IWX_READ_DATABASE_URL` is required for `read-api`
+- `IWX_READ_DATABASE_URL`, `IWX_EXCHANGE_CORE_SERVICE_URL`, `IWX_MATCHER_SERVICE_URL`, and `IWX_ORACLE_SERVICE_URL` are required for `projector`
 - `IWX_MATCHER_DATABASE_URL` is required for `matcher`
 - `IWX_ORACLE_DATABASE_URL` is required for `oracle`
 - services now fail fast on missing DB ownership config instead of falling back to `DATABASE_URL` or another service DB
@@ -277,6 +282,7 @@ Useful env vars:
 go_backend/
   cmd/auth
   cmd/migrate
+  cmd/projector
   cmd/read-api
   cmd/exchange-core
   cmd/matcher
@@ -293,11 +299,15 @@ go_backend/
   internal/httpapi
   internal/market
   internal/matching
+  internal/matcherhttp
+  internal/matcherhttpclient
   internal/messaging
   internal/messaging/natsbus
   internal/money
+  internal/projectionbundle
+  internal/projectionchange
+  internal/projector
   internal/readmodel
-  internal/realtime
   internal/store
   internal/store/postgres
   pkg/logging

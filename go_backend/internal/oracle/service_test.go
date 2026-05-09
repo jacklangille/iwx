@@ -2,11 +2,13 @@ package oracle
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
 	"iwx/go_backend/internal/domain"
 	"iwx/go_backend/internal/events"
+	"iwx/go_backend/internal/outbox"
 	"iwx/go_backend/internal/requestctx"
 	"iwx/go_backend/internal/store"
 )
@@ -38,6 +40,15 @@ func TestResolveContractPublishesTraceIDAndOutcome(t *testing.T) {
 			return &input, nil
 		},
 	}
+	var enqueued *events.ContractResolved
+	repo.enqueueOutboxFn = func(_ context.Context, event outbox.Event) error {
+		var payload events.ContractResolved
+		if err := json.Unmarshal(event.Payload, &payload); err != nil {
+			return err
+		}
+		enqueued = &payload
+		return nil
+	}
 
 	contracts := stubContractRepository{
 		getContractFn: func(context.Context, int64) (*domain.Contract, error) {
@@ -60,8 +71,7 @@ func TestResolveContractPublishesTraceIDAndOutcome(t *testing.T) {
 		},
 	}
 
-	publisher := &stubOracleEventPublisher{}
-	service := NewService(repo, contracts, nil, publisher)
+	service := NewService(repo, contracts, nil, &stubOracleEventPublisher{})
 
 	ctx := requestctx.WithTraceID(context.Background(), "trace-123")
 	resolution, err := service.ResolveContract(ctx, 1)
@@ -71,24 +81,26 @@ func TestResolveContractPublishesTraceIDAndOutcome(t *testing.T) {
 	if resolution.Outcome != domain.ResolutionOutcomeAbove {
 		t.Fatalf("expected above outcome, got %q", resolution.Outcome)
 	}
-	if publisher.published == nil {
-		t.Fatal("expected published event")
+	if enqueued == nil {
+		t.Fatal("expected enqueued outbox event")
 	}
-	if publisher.published.TraceID != "trace-123" {
-		t.Fatalf("expected trace id trace-123, got %q", publisher.published.TraceID)
+	if enqueued.TraceID != "trace-123" {
+		t.Fatalf("expected trace id trace-123, got %q", enqueued.TraceID)
 	}
-	if publisher.published.Outcome != string(domain.ResolutionOutcomeAbove) {
-		t.Fatalf("expected published above outcome, got %q", publisher.published.Outcome)
+	if enqueued.Outcome != string(domain.ResolutionOutcomeAbove) {
+		t.Fatalf("expected enqueued above outcome, got %q", enqueued.Outcome)
 	}
 }
 
 type stubOracleRepository struct {
 	upsertStationFn       func(context.Context, store.UpsertStationInput) (*domain.WeatherStation, error)
 	listStationsFn        func(context.Context, bool) ([]domain.WeatherStation, error)
+	findStationFn         func(context.Context, string, string) (*domain.WeatherStation, error)
 	recordObservationFn   func(context.Context, store.RecordObservationInput) (*domain.OracleObservation, error)
 	listObservationsFn    func(context.Context, int64, int) ([]domain.OracleObservation, error)
 	getLatestResolutionFn func(context.Context, int64) (*domain.ContractResolution, error)
 	insertResolutionFn    func(context.Context, domain.ContractResolution) (*domain.ContractResolution, error)
+	enqueueOutboxFn       func(context.Context, outbox.Event) error
 	resolveContractRepoFn func(context.Context, store.ResolveContractInput) (*domain.ContractResolution, error)
 }
 
@@ -102,6 +114,13 @@ func (s stubOracleRepository) UpsertStation(ctx context.Context, input store.Ups
 func (s stubOracleRepository) ListStations(ctx context.Context, activeOnly bool) ([]domain.WeatherStation, error) {
 	if s.listStationsFn != nil {
 		return s.listStationsFn(ctx, activeOnly)
+	}
+	return nil, nil
+}
+
+func (s stubOracleRepository) FindStation(ctx context.Context, providerName, stationID string) (*domain.WeatherStation, error) {
+	if s.findStationFn != nil {
+		return s.findStationFn(ctx, providerName, stationID)
 	}
 	return nil, nil
 }
@@ -132,6 +151,29 @@ func (s stubOracleRepository) InsertResolution(ctx context.Context, input domain
 		return s.insertResolutionFn(ctx, input)
 	}
 	return &input, nil
+}
+
+func (s stubOracleRepository) MarkResolutionPublished(context.Context, string, time.Time) error {
+	return nil
+}
+
+func (s stubOracleRepository) EnqueueOutboxEvent(ctx context.Context, event outbox.Event) error {
+	if s.enqueueOutboxFn != nil {
+		return s.enqueueOutboxFn(ctx, event)
+	}
+	return nil
+}
+
+func (s stubOracleRepository) ListPendingOutboxEvents(context.Context, int) ([]outbox.Event, error) {
+	return nil, nil
+}
+
+func (s stubOracleRepository) MarkOutboxEventPublished(context.Context, string, time.Time) error {
+	return nil
+}
+
+func (s stubOracleRepository) MarkOutboxEventFailed(context.Context, string, string) error {
+	return nil
 }
 
 func (s stubOracleRepository) ResolveContract(ctx context.Context, input store.ResolveContractInput) (*domain.ContractResolution, error) {

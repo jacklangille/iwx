@@ -10,7 +10,7 @@ import (
 
 	"iwx/go_backend/internal/commands"
 	"iwx/go_backend/internal/domain"
-	"iwx/go_backend/internal/readprojection"
+	"iwx/go_backend/internal/projectionchange"
 	"iwx/go_backend/internal/requestctx"
 	"iwx/go_backend/internal/store"
 )
@@ -26,11 +26,11 @@ func (e *ValidationError) Error() string {
 type Service struct {
 	repo           store.ExchangeCoreRepository
 	stationCatalog store.StationCatalog
-	projector      *readprojection.Projector
+	emitter        *projectionchange.Emitter
 }
 
-func NewService(repo store.ExchangeCoreRepository, stationCatalog store.StationCatalog, projector *readprojection.Projector) *Service {
-	return &Service{repo: repo, stationCatalog: stationCatalog, projector: projector}
+func NewService(repo store.ExchangeCoreRepository, stationCatalog store.StationCatalog, emitter *projectionchange.Emitter) *Service {
+	return &Service{repo: repo, stationCatalog: stationCatalog, emitter: emitter}
 }
 
 func (s *Service) SubmitCreateContract(ctx context.Context, command commands.CreateContract) (commands.CreateContractAccepted, error) {
@@ -47,6 +47,9 @@ func (s *Service) SubmitCreateContract(ctx context.Context, command commands.Cre
 	if strings.TrimSpace(command.DataProviderStationMode) == "" {
 		command.DataProviderStationMode = "single_station"
 	}
+	if err := s.rejectDuplicateMarket(ctx, command); err != nil {
+		return commands.CreateContractAccepted{}, err
+	}
 
 	enqueuedAt := time.Now().UTC().Truncate(time.Millisecond)
 	envelope := commands.CreateContractEnvelope{
@@ -60,8 +63,8 @@ func (s *Service) SubmitCreateContract(ctx context.Context, command commands.Cre
 	if err != nil {
 		return commands.CreateContractAccepted{}, err
 	}
-	if result.Contract != nil && s.projector != nil {
-		if err := s.projector.ProjectContract(ctx, result.Contract.ID); err != nil {
+	if result.Contract != nil && s.emitter != nil {
+		if err := s.emitter.EmitContractChanged(ctx, result.Contract.ID, result.Contract.UpdatedAt); err != nil {
 			return commands.CreateContractAccepted{}, err
 		}
 	}
@@ -77,6 +80,14 @@ func (s *Service) SubmitCreateContract(ctx context.Context, command commands.Cre
 
 func (s *Service) GetContractCommand(ctx context.Context, commandID string) (*commands.ContractCommand, error) {
 	return s.repo.GetContractCommand(ctx, commandID)
+}
+
+func (s *Service) GetContractByID(ctx context.Context, contractID int64) (*domain.Contract, error) {
+	return s.repo.GetContract(ctx, contractID)
+}
+
+func (s *Service) GetContractRuleByContractID(ctx context.Context, contractID int64) (*domain.ContractRule, error) {
+	return s.repo.GetContractRule(ctx, contractID)
 }
 
 func ValidateCreateContract(command commands.CreateContract) error {
@@ -123,6 +134,33 @@ func ValidateCreateContract(command commands.CreateContract) error {
 	}
 
 	return nil
+}
+
+func (s *Service) rejectDuplicateMarket(ctx context.Context, command commands.CreateContract) error {
+	if s.repo == nil {
+		return fmt.Errorf("exchange core repository unavailable")
+	}
+
+	duplicate, err := s.repo.FindDuplicateContract(ctx, store.FindDuplicateContractInput{
+		ProviderName:           command.DataProviderName,
+		StationID:              command.StationID,
+		Metric:                 command.Metric,
+		Threshold:              command.Threshold,
+		TradingPeriodStart:     command.TradingPeriodStart,
+		TradingPeriodEnd:       command.TradingPeriodEnd,
+		MeasurementPeriodStart: command.MeasurementPeriodStart,
+		MeasurementPeriodEnd:   command.MeasurementPeriodEnd,
+	})
+	if err != nil {
+		return err
+	}
+	if duplicate == nil {
+		return nil
+	}
+
+	return &ValidationError{Errors: map[string][]string{
+		"contract": {fmt.Sprintf("duplicate market already exists as contract %d in status %s", duplicate.ID, duplicate.Status)},
+	}}
 }
 
 func (s *Service) validateAndPopulateStation(ctx context.Context, command commands.CreateContract) (*domain.WeatherStation, error) {
@@ -202,9 +240,9 @@ func parseCommandDate(value string) (time.Time, error) {
 }
 
 func (s *Service) projectUser(ctx context.Context, userID int64) error {
-	if s.projector == nil || userID <= 0 {
+	if s.emitter == nil || userID <= 0 {
 		return nil
 	}
 
-	return s.projector.ProjectUserState(ctx, userID)
+	return s.emitter.EmitUserStateChanged(ctx, userID, time.Now().UTC())
 }

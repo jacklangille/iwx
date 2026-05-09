@@ -268,9 +268,12 @@ func (s *Service) requireOwnedContract(ctx context.Context, contractID, userID i
 }
 
 func (s *Service) projectContract(ctx context.Context, contractID int64) error {
-	if s.projector == nil {
+	if s.emitter == nil {
 		return nil
 	}
-
-	return s.projector.ProjectContract(ctx, contractID)
+	contract, err := s.repo.GetContract(ctx, contractID)
+	if err != nil || contract == nil {
+		return err
+	}
+	return s.emitter.EmitContractChanged(ctx, contractID, contract.UpdatedAt)
 }

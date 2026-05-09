@@ -1,7 +1,6 @@
 package exchangecorehttp
 
 import (
-	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -13,6 +12,7 @@ import (
 	"iwx/go_backend/internal/authcontext"
 	"iwx/go_backend/internal/commands"
 	"iwx/go_backend/internal/exchangecore"
+	"iwx/go_backend/internal/httpjson"
 	"iwx/go_backend/internal/matching"
 	"iwx/go_backend/internal/requestctx"
 	"iwx/go_backend/pkg/logging"
@@ -112,56 +112,22 @@ func (s *Server) handleOrdersCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func decodePlaceOrderCommand(body io.Reader) (commands.PlaceOrder, error) {
-	if body == nil {
-		return commands.PlaceOrder{}, errors.New("request body is required")
+	var request struct {
+		ContractID int64                   `json:"contract_id"`
+		TokenType  string                  `json:"token_type"`
+		OrderSide  string                  `json:"order_side"`
+		Price      httpjson.FlexibleString `json:"price"`
+		Quantity   int64                   `json:"quantity"`
 	}
-
-	var payload map[string]json.RawMessage
-	if err := json.NewDecoder(body).Decode(&payload); err != nil {
+	if err := httpjson.DecodeStrict(body, &request); err != nil {
 		return commands.PlaceOrder{}, err
 	}
 
-	command := commands.PlaceOrder{}
-	if raw := payload["contract_id"]; raw != nil {
-		if err := json.Unmarshal(raw, &command.ContractID); err != nil {
-			return commands.PlaceOrder{}, err
-		}
-	}
-	if raw := payload["token_type"]; raw != nil {
-		if err := json.Unmarshal(raw, &command.TokenType); err != nil {
-			return commands.PlaceOrder{}, err
-		}
-	}
-	if raw := payload["order_side"]; raw != nil {
-		if err := json.Unmarshal(raw, &command.OrderSide); err != nil {
-			return commands.PlaceOrder{}, err
-		}
-	}
-	if raw := payload["quantity"]; raw != nil {
-		if err := json.Unmarshal(raw, &command.Quantity); err != nil {
-			return commands.PlaceOrder{}, err
-		}
-	}
-	if raw := payload["price"]; raw != nil {
-		command.Price = decodePrice(raw)
-	}
-
-	command.TokenType = strings.ToLower(strings.TrimSpace(command.TokenType))
-	command.OrderSide = strings.ToLower(strings.TrimSpace(command.OrderSide))
-
-	return command, nil
-}
-
-func decodePrice(raw json.RawMessage) string {
-	var asString string
-	if err := json.Unmarshal(raw, &asString); err == nil {
-		return asString
-	}
-
-	var asNumber json.Number
-	if err := json.Unmarshal(raw, &asNumber); err == nil {
-		return asNumber.String()
-	}
-
-	return ""
+	return commands.PlaceOrder{
+		ContractID: request.ContractID,
+		TokenType:  strings.ToLower(strings.TrimSpace(request.TokenType)),
+		OrderSide:  strings.ToLower(strings.TrimSpace(request.OrderSide)),
+		Price:      request.Price.String(),
+		Quantity:   request.Quantity,
+	}, nil
 }

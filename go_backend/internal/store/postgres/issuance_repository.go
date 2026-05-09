@@ -262,7 +262,8 @@ func getContractForUpdateTx(ctx context.Context, tx *sql.Tx, contractID int64) (
 			data_provider_name,
 			station_id,
 			data_provider_station_mode,
-			description
+			description,
+			updated_at
 		FROM contracts
 		WHERE id = $1
 		FOR UPDATE

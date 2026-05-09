@@ -195,13 +195,13 @@ func (s *Server) handleMePortfolioShow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
-		"user_id":           claims.UserID,
-		"accounts":          serializeCashAccounts(accounts),
-		"positions":         serializePositions(positions),
-		"position_locks":    serializePositionLocks(positionLocks),
-		"collateral_locks":  serializeCollateralLocks(collateralLocks),
-		"cash_reservations": serializeOrderCashReservations(cashReservations),
+	writeJSON(w, http.StatusOK, portfolioResponse{
+		UserID:           claims.UserID,
+		Accounts:         serializeCashAccounts(accounts),
+		Positions:        serializePositions(positions),
+		PositionLocks:    serializePositionLocks(positionLocks),
+		CollateralLocks:  serializeCollateralLocks(collateralLocks),
+		CashReservations: serializeOrderCashReservations(cashReservations),
 	})
 }
 

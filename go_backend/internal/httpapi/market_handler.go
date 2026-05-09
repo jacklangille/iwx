@@ -74,12 +74,12 @@ func (s *Server) handleMarketSnapshots(w http.ResponseWriter, r *http.Request, c
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
-		"config": map[string]any{
-			"lookback_seconds": config.LookbackSeconds,
-			"bucket_seconds":   config.BucketSeconds,
+	writeJSON(w, http.StatusOK, marketSnapshotsResponse{
+		Config: chartConfigResponse{
+			LookbackSeconds: config.LookbackSeconds,
+			BucketSeconds:   config.BucketSeconds,
 		},
-		"points": serializeChartPoints(points),
+		Points: serializeChartPoints(points),
 	})
 }
 
@@ -108,10 +108,10 @@ func (s *Server) handleExecutions(w http.ResponseWriter, r *http.Request, contra
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
-		"contract_id": contractID,
-		"limit":       limit,
-		"executions":  serializeExecutions(executions),
+	writeJSON(w, http.StatusOK, marketExecutionsResponse{
+		ContractID: contractID,
+		Limit:      limit,
+		Executions: serializeExecutions(executions),
 	})
 }
 
@@ -139,9 +139,9 @@ func (s *Server) handleObservations(w http.ResponseWriter, r *http.Request, cont
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
-		"contract_id":  contractID,
-		"observations": serializeOracleObservations(observations),
+	writeJSON(w, http.StatusOK, marketObservationsResponse{
+		ContractID:   contractID,
+		Observations: serializeOracleObservations(observations),
 	})
 }
 
@@ -187,8 +187,8 @@ func (s *Server) handleSettlements(w http.ResponseWriter, r *http.Request, contr
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
-		"contract_id": contractID,
-		"entries":     serializeSettlementEntries(entries),
+	writeJSON(w, http.StatusOK, marketSettlementsResponse{
+		ContractID: contractID,
+		Entries:    serializeSettlementEntries(entries),
 	})
 }

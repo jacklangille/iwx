@@ -56,7 +56,7 @@ Target service set:
 - `read-api`
   - public/private query APIs
   - denormalized UI projections
-  - realtime fanout
+  - UI-facing market/query APIs
 - React frontend
 
 ## Critical Ownership Rule
@@ -210,12 +210,12 @@ What is implemented today:
   - cash reservations
 - read-api delivery:
   - short-lived in-memory caching for hot market reads
-  - polling-based SSE endpoints for market, order command, and portfolio updates
+  - browser-polled JSON endpoints for market, order command, and portfolio updates
 
 What is transitional and expected to change:
 
 - projection writes are currently service-driven syncs, not an event-driven projection pipeline yet
-- SSE delivery is currently polling-based rather than event-driven
+- the current UI uses direct browser polling against read endpoints rather than server-side push
 
 ## Immediate Architecture Direction
 
@@ -223,7 +223,7 @@ Near-term priorities:
 
 1. keep Go as the only backend evolution path
 2. harden service-to-service auth between Go services
-3. replace polling SSE with event-driven push off matcher and exchange-core events
+3. add event-driven push only if the product actually needs lower-latency subscriptions
 4. continue hardening execution-to-portfolio synchronization with integration and replay tooling
 5. expand the React UI around contract lifecycle and portfolio workflows
 6. harden service-level observability and dead-letter handling

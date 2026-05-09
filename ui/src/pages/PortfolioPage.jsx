@@ -40,11 +40,13 @@ export function PortfolioPage() {
     queryKey: ["portfolio", token],
     queryFn: () => getPortfolio(token),
     enabled: isAuthenticated,
+    refetchInterval: isAuthenticated ? 5_000 : false,
   });
   const settlementsQuery = useQuery({
     queryKey: ["portfolio-settlements", token],
     queryFn: () => getUserSettlements(token),
     enabled: isAuthenticated,
+    refetchInterval: isAuthenticated ? 5_000 : false,
   });
 
   const depositMutation = useMutation({

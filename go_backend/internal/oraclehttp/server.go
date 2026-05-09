@@ -41,6 +41,8 @@ func (s *Server) ListenAndServe() error {
 func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/", s.handleIndex)
 	s.mux.HandleFunc("/api/oracle/stations", s.handleStations)
+	s.mux.HandleFunc("/internal/stations/", s.handleInternalStationLookup)
+	s.mux.HandleFunc("/internal/projection/", s.handleInternalProjection)
 	s.mux.HandleFunc("/api/oracle/observations", s.handleObservations)
 	s.mux.HandleFunc("/api/oracle/contracts/", s.handleContractSubroutes)
 }

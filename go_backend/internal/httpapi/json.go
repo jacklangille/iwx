@@ -8,8 +8,281 @@ import (
 	"iwx/go_backend/internal/readmodel"
 )
 
-func serializeContracts(summaries []readmodel.ContractSummary) []map[string]any {
-	rows := make([]map[string]any, 0, len(summaries))
+type contractSummaryResponse struct {
+	ID                      int64    `json:"id"`
+	CreatorUserID           *int64   `json:"creator_user_id"`
+	AsOf                    *string  `json:"as_of"`
+	Sequence                *int64   `json:"sequence"`
+	Name                    string   `json:"name"`
+	Region                  string   `json:"region"`
+	Metric                  string   `json:"metric"`
+	Status                  string   `json:"status"`
+	Threshold               *int64   `json:"threshold"`
+	Multiplier              *int64   `json:"multiplier"`
+	MeasurementUnit         *string  `json:"measurement_unit"`
+	TradingPeriodStart      *string  `json:"trading_period_start"`
+	TradingPeriodEnd        *string  `json:"trading_period_end"`
+	MeasurementPeriodStart  *string  `json:"measurement_period_start"`
+	MeasurementPeriodEnd    *string  `json:"measurement_period_end"`
+	DataProviderName        *string  `json:"data_provider_name"`
+	StationID               *string  `json:"station_id"`
+	DataProviderStationMode *string  `json:"data_provider_station_mode"`
+	Description             *string  `json:"description"`
+	BestAboveBid            *string `json:"best_above_bid"`
+	BestBelowBid            *string `json:"best_below_bid"`
+	MidAbove                *string `json:"mid_above"`
+	MidBelow                *string `json:"mid_below"`
+	MidPrice                *string `json:"mid_price"`
+}
+
+type cashAccountResponse struct {
+	ID             int64  `json:"id"`
+	UserID         int64  `json:"user_id"`
+	Currency       string `json:"currency"`
+	AvailableCents int64  `json:"available_cents"`
+	LockedCents    int64  `json:"locked_cents"`
+	TotalCents     int64  `json:"total_cents"`
+	UpdatedAt      string `json:"updated_at"`
+}
+
+type positionResponse struct {
+	ID                int64  `json:"id"`
+	UserID            int64  `json:"user_id"`
+	ContractID        int64  `json:"contract_id"`
+	Side              string `json:"side"`
+	AvailableQuantity int64  `json:"available_quantity"`
+	LockedQuantity    int64  `json:"locked_quantity"`
+	TotalQuantity     int64  `json:"total_quantity"`
+	UpdatedAt         string `json:"updated_at"`
+}
+
+type positionLockResponse struct {
+	ID            int64   `json:"id"`
+	UserID        int64   `json:"user_id"`
+	ContractID    int64   `json:"contract_id"`
+	Side          string  `json:"side"`
+	Quantity      int64   `json:"quantity"`
+	Status        string  `json:"status"`
+	OrderID       *int64  `json:"order_id"`
+	ReferenceType *string `json:"reference_type"`
+	ReferenceID   *string `json:"reference_id"`
+	CorrelationID *string `json:"correlation_id"`
+	Description   *string `json:"description"`
+	CreatedAt     string  `json:"created_at"`
+	UpdatedAt     string  `json:"updated_at"`
+	ReleasedAt    *string `json:"released_at"`
+}
+
+type collateralLockResponse struct {
+	ID                  int64   `json:"id"`
+	UserID              int64   `json:"user_id"`
+	ContractID          int64   `json:"contract_id"`
+	Currency            string  `json:"currency"`
+	AmountCents         int64   `json:"amount_cents"`
+	Status              string  `json:"status"`
+	ReferenceID         *string `json:"reference_id"`
+	Description         *string `json:"description"`
+	ReferenceIssuanceID *int64  `json:"reference_issuance_id"`
+	CreatedAt           string  `json:"created_at"`
+	UpdatedAt           string  `json:"updated_at"`
+	ReleasedAt          *string `json:"released_at"`
+}
+
+type orderCashReservationResponse struct {
+	ID            int64   `json:"id"`
+	UserID        int64   `json:"user_id"`
+	ContractID    int64   `json:"contract_id"`
+	Currency      string  `json:"currency"`
+	AmountCents   int64   `json:"amount_cents"`
+	Status        string  `json:"status"`
+	ReferenceType *string `json:"reference_type"`
+	ReferenceID   *string `json:"reference_id"`
+	CorrelationID *string `json:"correlation_id"`
+	Description   *string `json:"description"`
+	CreatedAt     string  `json:"created_at"`
+	UpdatedAt     string  `json:"updated_at"`
+	ReleasedAt    *string `json:"released_at"`
+}
+
+type settlementEntryResponse struct {
+	ID          int64  `json:"id"`
+	ContractID  int64  `json:"contract_id"`
+	UserID      int64  `json:"user_id"`
+	EntryType   string `json:"entry_type"`
+	Outcome     string `json:"outcome"`
+	AmountCents int64  `json:"amount_cents"`
+	Quantity    int64  `json:"quantity"`
+	ReferenceID string `json:"reference_id"`
+	CreatedAt   string `json:"created_at"`
+}
+
+type executionResponse struct {
+	ID           int64  `json:"id"`
+	ExecutionID  string `json:"execution_id"`
+	ContractID   int64  `json:"contract_id"`
+	BuyOrderID   int64  `json:"buy_order_id"`
+	SellOrderID  int64  `json:"sell_order_id"`
+	BuyerUserID  int64  `json:"buyer_user_id"`
+	SellerUserID int64  `json:"seller_user_id"`
+	Price        string `json:"price"`
+	Quantity     int64  `json:"quantity"`
+	Sequence     int64  `json:"sequence"`
+	OccurredAt   string `json:"occurred_at"`
+}
+
+type oracleObservationResponse struct {
+	ID                     int64  `json:"id"`
+	ContractID             int64  `json:"contract_id"`
+	ProviderName           string `json:"provider_name"`
+	StationID              string `json:"station_id"`
+	ObservedMetric         string `json:"observed_metric"`
+	ObservationWindowStart string `json:"observation_window_start"`
+	ObservationWindowEnd   string `json:"observation_window_end"`
+	ObservedValue          string `json:"observed_value"`
+	NormalizedValue        string `json:"normalized_value"`
+	ObservedAt             string `json:"observed_at"`
+	RecordedAt             string `json:"recorded_at"`
+}
+
+type contractResolutionResponse struct {
+	ID                     int64  `json:"id"`
+	ContractID             int64  `json:"contract_id"`
+	ProviderName           string `json:"provider_name"`
+	StationID              string `json:"station_id"`
+	ObservedMetric         string `json:"observed_metric"`
+	ObservationWindowStart string `json:"observation_window_start"`
+	ObservationWindowEnd   string `json:"observation_window_end"`
+	RuleVersion            string `json:"rule_version"`
+	ResolvedValue          string `json:"resolved_value"`
+	Outcome                string `json:"outcome"`
+	ResolvedAt             string `json:"resolved_at"`
+}
+
+type orderResponse struct {
+	ID         int64  `json:"id"`
+	ContractID int64  `json:"contract_id"`
+	UserID     int64  `json:"user_id"`
+	TokenType  string `json:"token_type"`
+	OrderSide  string `json:"order_side"`
+	Price      string `json:"price"`
+	Quantity   int64  `json:"quantity"`
+	Status     string `json:"status"`
+}
+
+type orderCommandResponse struct {
+	CommandID     string  `json:"command_id"`
+	ContractID    int64   `json:"contract_id"`
+	UserID        int64   `json:"user_id"`
+	TokenType     string  `json:"token_type"`
+	OrderSide     string  `json:"order_side"`
+	Price         string  `json:"price"`
+	Quantity      int64   `json:"quantity"`
+	Status        string  `json:"status"`
+	ErrorMessage  *string `json:"error_message"`
+	ResultStatus  *string `json:"result_status"`
+	ResultOrderID *int64  `json:"result_order_id"`
+	EnqueuedAt    string  `json:"enqueued_at"`
+	StartedAt     *string `json:"started_at"`
+	CompletedAt   *string `json:"completed_at"`
+	UpdatedAt     string  `json:"updated_at"`
+}
+
+type priceLevelResponse struct {
+	Price    string `json:"price"`
+	Quantity int64  `json:"quantity"`
+}
+
+type chartPointResponse struct {
+	BucketStart string  `json:"bucket_start"`
+	InsertedAt  string  `json:"inserted_at"`
+	MidAbove    *string `json:"mid_above"`
+	MidBelow    *string `json:"mid_below"`
+	BestAbove   *string `json:"best_above"`
+	BestBelow   *string `json:"best_below"`
+}
+
+type chartConfigResponse struct {
+	LookbackSeconds int64 `json:"lookback_seconds"`
+	BucketSeconds   int64 `json:"bucket_seconds"`
+}
+
+type marketSnapshotsResponse struct {
+	Config chartConfigResponse `json:"config"`
+	Points []chartPointResponse `json:"points"`
+}
+
+type marketExecutionsResponse struct {
+	ContractID int64               `json:"contract_id"`
+	Limit      int                 `json:"limit"`
+	Executions []executionResponse `json:"executions"`
+}
+
+type marketObservationsResponse struct {
+	ContractID   int64                      `json:"contract_id"`
+	Observations []oracleObservationResponse `json:"observations"`
+}
+
+type marketSettlementsResponse struct {
+	ContractID int64                    `json:"contract_id"`
+	Entries    []settlementEntryResponse `json:"entries"`
+}
+
+type marketStateResponse struct {
+	ContractID int64                    `json:"contract_id"`
+	Sequence   *int64                   `json:"sequence"`
+	AsOf       *string                  `json:"as_of"`
+	OrderBook  marketOrderBookResponse  `json:"order_book"`
+	Summary    marketSummaryResponse    `json:"summary"`
+}
+
+type marketOrderBookResponse struct {
+	Above marketBookSideResponse `json:"above"`
+	Below marketBookSideResponse `json:"below"`
+}
+
+type marketBookSideResponse struct {
+	Bid []priceLevelResponse `json:"bid"`
+	Ask []priceLevelResponse `json:"ask"`
+}
+
+type marketSummaryResponse struct {
+	Best              marketBestResponse      `json:"best"`
+	Mid               marketMidResponse       `json:"mid"`
+	Liquidity         marketLiquidityResponse `json:"liquidity"`
+	AboveBelowBidGap  *string                 `json:"above_below_bid_gap"`
+}
+
+type marketBestResponse struct {
+	Above marketQuoteResponse `json:"above"`
+	Below marketQuoteResponse `json:"below"`
+}
+
+type marketQuoteResponse struct {
+	Bid *string `json:"bid"`
+	Ask *string `json:"ask"`
+}
+
+type marketMidResponse struct {
+	Above *string `json:"above"`
+	Below *string `json:"below"`
+}
+
+type marketLiquidityResponse struct {
+	Above int64 `json:"above"`
+	Below int64 `json:"below"`
+}
+
+type portfolioResponse struct {
+	UserID           int64                        `json:"user_id"`
+	Accounts         []cashAccountResponse        `json:"accounts"`
+	Positions        []positionResponse           `json:"positions"`
+	PositionLocks    []positionLockResponse       `json:"position_locks"`
+	CollateralLocks  []collateralLockResponse     `json:"collateral_locks"`
+	CashReservations []orderCashReservationResponse `json:"cash_reservations"`
+}
+
+func serializeContracts(summaries []readmodel.ContractSummary) []contractSummaryResponse {
+	rows := make([]contractSummaryResponse, 0, len(summaries))
 	for _, summary := range summaries {
 		rows = append(rows, serializeContract(summary))
 	}
@@ -17,167 +290,166 @@ func serializeContracts(summaries []readmodel.ContractSummary) []map[string]any 
 	return rows
 }
 
-func serializeCashAccounts(accounts []domain.CashAccount) []map[string]any {
-	rows := make([]map[string]any, 0, len(accounts))
+func serializeCashAccounts(accounts []domain.CashAccount) []cashAccountResponse {
+	rows := make([]cashAccountResponse, 0, len(accounts))
 	for _, account := range accounts {
 		rows = append(rows, serializeCashAccount(account))
 	}
 	return rows
 }
 
-func serializeCashAccount(account domain.CashAccount) map[string]any {
-	return map[string]any{
-		"id":              account.ID,
-		"user_id":         account.UserID,
-		"currency":        account.Currency,
-		"available_cents": account.AvailableCents,
-		"locked_cents":    account.LockedCents,
-		"total_cents":     account.TotalCents,
-		"updated_at":      account.UpdatedAt.UTC().Format(time.RFC3339),
+func serializeCashAccount(account domain.CashAccount) cashAccountResponse {
+	return cashAccountResponse{
+		ID:             account.ID,
+		UserID:         account.UserID,
+		Currency:       account.Currency,
+		AvailableCents: account.AvailableCents,
+		LockedCents:    account.LockedCents,
+		TotalCents:     account.TotalCents,
+		UpdatedAt:      account.UpdatedAt.UTC().Format(time.RFC3339),
 	}
 }
 
-func serializeContract(summary readmodel.ContractSummary) map[string]any {
-	return map[string]any{
-		"id":                         summary.Contract.ID,
-		"creator_user_id":            summary.Contract.CreatorUserID,
-		"as_of":                      timestampString(summary.Market.AsOf),
-		"sequence":                   summary.Market.Sequence,
-		"name":                       summary.Contract.Name,
-		"region":                     summary.Contract.Region,
-		"metric":                     summary.Contract.Metric,
-		"status":                     summary.Contract.Status,
-		"threshold":                  summary.Contract.Threshold,
-		"multiplier":                 summary.Contract.Multiplier,
-		"measurement_unit":           blankToNil(summary.Contract.MeasurementUnit),
-		"trading_period_start":       dateString(summary.Contract.TradingPeriodStart),
-		"trading_period_end":         dateString(summary.Contract.TradingPeriodEnd),
-		"measurement_period_start":   dateString(summary.Contract.MeasurementPeriodStart),
-		"measurement_period_end":     dateString(summary.Contract.MeasurementPeriodEnd),
-		"data_provider_name":         blankToNil(summary.Contract.DataProviderName),
-		"station_id":                 blankToNil(summary.Contract.StationID),
-		"data_provider_station_mode": blankToNil(summary.Contract.DataProviderStationMode),
-		"description":                blankToNil(summary.Contract.Description),
-		"best_above_bid":             summary.Market.Summary.Best.Above.Bid,
-		"best_below_bid":             summary.Market.Summary.Best.Below.Bid,
-		"mid_above":                  summary.Market.Summary.Mid.Above,
-		"mid_below":                  summary.Market.Summary.Mid.Below,
-		"mid_price":                  summary.Market.Summary.MidPrice,
+func serializeContract(summary readmodel.ContractSummary) contractSummaryResponse {
+	return contractSummaryResponse{
+		ID:                      summary.Contract.ID,
+		CreatorUserID:           summary.Contract.CreatorUserID,
+		AsOf:                    timestampString(summary.Market.AsOf),
+		Sequence:                summary.Market.Sequence,
+		Name:                    summary.Contract.Name,
+		Region:                  summary.Contract.Region,
+		Metric:                  summary.Contract.Metric,
+		Status:                  summary.Contract.Status,
+		Threshold:               summary.Contract.Threshold,
+		Multiplier:              summary.Contract.Multiplier,
+		MeasurementUnit:         stringOrNil(summary.Contract.MeasurementUnit),
+		TradingPeriodStart:      dateString(summary.Contract.TradingPeriodStart),
+		TradingPeriodEnd:        dateString(summary.Contract.TradingPeriodEnd),
+		MeasurementPeriodStart:  dateString(summary.Contract.MeasurementPeriodStart),
+		MeasurementPeriodEnd:    dateString(summary.Contract.MeasurementPeriodEnd),
+		DataProviderName:        stringOrNil(summary.Contract.DataProviderName),
+		StationID:               stringOrNil(summary.Contract.StationID),
+		DataProviderStationMode: stringOrNil(summary.Contract.DataProviderStationMode),
+		Description:             stringOrNil(summary.Contract.Description),
+		BestAboveBid:            summary.Market.Summary.Best.Above.Bid,
+		BestBelowBid:            summary.Market.Summary.Best.Below.Bid,
+		MidAbove:                summary.Market.Summary.Mid.Above,
+		MidBelow:                summary.Market.Summary.Mid.Below,
+		MidPrice:                summary.Market.Summary.MidPrice,
 	}
 }
 
-func serializeOrders(orders []domain.Order) []map[string]any {
-	rows := make([]map[string]any, 0, len(orders))
+func serializeOrders(orders []domain.Order) []orderResponse {
+	rows := make([]orderResponse, 0, len(orders))
 	for _, order := range orders {
 		rows = append(rows, serializeOrder(order))
 	}
-
 	return rows
 }
 
-func serializePositions(positions []domain.Position) []map[string]any {
-	rows := make([]map[string]any, 0, len(positions))
+func serializePositions(positions []domain.Position) []positionResponse {
+	rows := make([]positionResponse, 0, len(positions))
 	for _, position := range positions {
-		rows = append(rows, map[string]any{
-			"id":                 position.ID,
-			"user_id":            position.UserID,
-			"contract_id":        position.ContractID,
-			"side":               position.Side,
-			"available_quantity": position.AvailableQuantity,
-			"locked_quantity":    position.LockedQuantity,
-			"total_quantity":     position.TotalQuantity,
-			"updated_at":         position.UpdatedAt.UTC().Format(time.RFC3339),
+		rows = append(rows, positionResponse{
+			ID:                position.ID,
+			UserID:            position.UserID,
+			ContractID:        position.ContractID,
+			Side:              string(position.Side),
+			AvailableQuantity: position.AvailableQuantity,
+			LockedQuantity:    position.LockedQuantity,
+			TotalQuantity:     position.TotalQuantity,
+			UpdatedAt:         position.UpdatedAt.UTC().Format(time.RFC3339),
 		})
 	}
 	return rows
 }
 
-func serializePositionLocks(locks []domain.PositionLock) []map[string]any {
-	rows := make([]map[string]any, 0, len(locks))
+func serializePositionLocks(locks []domain.PositionLock) []positionLockResponse {
+	rows := make([]positionLockResponse, 0, len(locks))
 	for _, lock := range locks {
-		rows = append(rows, map[string]any{
-			"id":             lock.ID,
-			"user_id":        lock.UserID,
-			"contract_id":    lock.ContractID,
-			"side":           lock.Side,
-			"quantity":       lock.Quantity,
-			"status":         lock.Status,
-			"order_id":       lock.OrderID,
-			"reference_type": blankToNil(lock.ReferenceType),
-			"reference_id":   blankToNil(lock.ReferenceID),
-			"correlation_id": blankToNil(lock.CorrelationID),
-			"description":    blankToNil(lock.Description),
-			"created_at":     lock.CreatedAt.UTC().Format(time.RFC3339),
-			"updated_at":     lock.UpdatedAt.UTC().Format(time.RFC3339),
-			"released_at":    timestampRFC3339(lock.ReleasedAt),
+		rows = append(rows, positionLockResponse{
+			ID:            lock.ID,
+			UserID:        lock.UserID,
+			ContractID:    lock.ContractID,
+			Side:          string(lock.Side),
+			Quantity:      lock.Quantity,
+			Status:        string(lock.Status),
+			OrderID:       lock.OrderID,
+			ReferenceType: stringOrNil(lock.ReferenceType),
+			ReferenceID:   stringOrNil(lock.ReferenceID),
+			CorrelationID: stringOrNil(lock.CorrelationID),
+			Description:   stringOrNil(lock.Description),
+			CreatedAt:     lock.CreatedAt.UTC().Format(time.RFC3339),
+			UpdatedAt:     lock.UpdatedAt.UTC().Format(time.RFC3339),
+			ReleasedAt:    timestampRFC3339(lock.ReleasedAt),
 		})
 	}
 	return rows
 }
 
-func serializeCollateralLocks(locks []domain.CollateralLock) []map[string]any {
-	rows := make([]map[string]any, 0, len(locks))
+func serializeCollateralLocks(locks []domain.CollateralLock) []collateralLockResponse {
+	rows := make([]collateralLockResponse, 0, len(locks))
 	for _, lock := range locks {
-		rows = append(rows, map[string]any{
-			"id":                    lock.ID,
-			"user_id":               lock.UserID,
-			"contract_id":           lock.ContractID,
-			"currency":              lock.Currency,
-			"amount_cents":          lock.AmountCents,
-			"status":                lock.Status,
-			"reference_id":          blankToNil(lock.ReferenceID),
-			"description":           blankToNil(lock.Description),
-			"reference_issuance_id": lock.ReferenceIssuanceID,
-			"created_at":            lock.CreatedAt.UTC().Format(time.RFC3339),
-			"updated_at":            lock.UpdatedAt.UTC().Format(time.RFC3339),
-			"released_at":           timestampRFC3339(lock.ReleasedAt),
+		rows = append(rows, collateralLockResponse{
+			ID:                  lock.ID,
+			UserID:              lock.UserID,
+			ContractID:          lock.ContractID,
+			Currency:            lock.Currency,
+			AmountCents:         lock.AmountCents,
+			Status:              string(lock.Status),
+			ReferenceID:         stringOrNil(lock.ReferenceID),
+			Description:         stringOrNil(lock.Description),
+			ReferenceIssuanceID: lock.ReferenceIssuanceID,
+			CreatedAt:           lock.CreatedAt.UTC().Format(time.RFC3339),
+			UpdatedAt:           lock.UpdatedAt.UTC().Format(time.RFC3339),
+			ReleasedAt:          timestampRFC3339(lock.ReleasedAt),
 		})
 	}
 	return rows
 }
 
-func serializeOrderCashReservations(reservations []domain.OrderCashReservation) []map[string]any {
-	rows := make([]map[string]any, 0, len(reservations))
+func serializeOrderCashReservations(reservations []domain.OrderCashReservation) []orderCashReservationResponse {
+	rows := make([]orderCashReservationResponse, 0, len(reservations))
 	for _, reservation := range reservations {
-		rows = append(rows, map[string]any{
-			"id":             reservation.ID,
-			"user_id":        reservation.UserID,
-			"contract_id":    reservation.ContractID,
-			"currency":       reservation.Currency,
-			"amount_cents":   reservation.AmountCents,
-			"status":         reservation.Status,
-			"reference_type": blankToNil(reservation.ReferenceType),
-			"reference_id":   blankToNil(reservation.ReferenceID),
-			"correlation_id": blankToNil(reservation.CorrelationID),
-			"description":    blankToNil(reservation.Description),
-			"created_at":     reservation.CreatedAt.UTC().Format(time.RFC3339),
-			"updated_at":     reservation.UpdatedAt.UTC().Format(time.RFC3339),
-			"released_at":    timestampRFC3339(reservation.ReleasedAt),
+		rows = append(rows, orderCashReservationResponse{
+			ID:            reservation.ID,
+			UserID:        reservation.UserID,
+			ContractID:    reservation.ContractID,
+			Currency:      reservation.Currency,
+			AmountCents:   reservation.AmountCents,
+			Status:        string(reservation.Status),
+			ReferenceType: stringOrNil(reservation.ReferenceType),
+			ReferenceID:   stringOrNil(reservation.ReferenceID),
+			CorrelationID: stringOrNil(reservation.CorrelationID),
+			Description:   stringOrNil(reservation.Description),
+			CreatedAt:     reservation.CreatedAt.UTC().Format(time.RFC3339),
+			UpdatedAt:     reservation.UpdatedAt.UTC().Format(time.RFC3339),
+			ReleasedAt:    timestampRFC3339(reservation.ReleasedAt),
 		})
 	}
 	return rows
 }
 
-func serializeSettlementEntries(entries []domain.SettlementEntry) []map[string]any {
-	rows := make([]map[string]any, 0, len(entries))
+func serializeSettlementEntries(entries []domain.SettlementEntry) []settlementEntryResponse {
+	rows := make([]settlementEntryResponse, 0, len(entries))
 	for _, entry := range entries {
-		rows = append(rows, map[string]any{
-			"id":           entry.ID,
-			"contract_id":  entry.ContractID,
-			"user_id":      entry.UserID,
-			"entry_type":   entry.EntryType,
-			"outcome":      entry.Outcome,
-			"amount_cents": entry.AmountCents,
-			"quantity":     entry.Quantity,
-			"reference_id": entry.ReferenceID,
-			"created_at":   entry.CreatedAt.UTC().Format(time.RFC3339),
+		rows = append(rows, settlementEntryResponse{
+			ID:          entry.ID,
+			ContractID:  entry.ContractID,
+			UserID:      entry.UserID,
+			EntryType:   string(entry.EntryType),
+			Outcome:     string(entry.Outcome),
+			AmountCents: entry.AmountCents,
+			Quantity:    entry.Quantity,
+			ReferenceID: entry.ReferenceID,
+			CreatedAt:   entry.CreatedAt.UTC().Format(time.RFC3339),
 		})
 	}
 	return rows
 }
 
-func serializeExecutions(executions []domain.Execution) []map[string]any {
-	rows := make([]map[string]any, 0, len(executions))
+func serializeExecutions(executions []domain.Execution) []executionResponse {
+	rows := make([]executionResponse, 0, len(executions))
 	for _, execution := range executions {
 		rows = append(rows, serializeExecution(execution))
 	}
@@ -185,255 +457,283 @@ func serializeExecutions(executions []domain.Execution) []map[string]any {
 	return rows
 }
 
-func serializeOracleObservations(observations []domain.OracleObservation) []map[string]any {
-	rows := make([]map[string]any, 0, len(observations))
+func serializeOracleObservations(observations []domain.OracleObservation) []oracleObservationResponse {
+	rows := make([]oracleObservationResponse, 0, len(observations))
 	for _, observation := range observations {
 		rows = append(rows, serializeOracleObservation(observation))
 	}
 	return rows
 }
 
-func serializeOracleObservation(observation domain.OracleObservation) map[string]any {
-	return map[string]any{
-		"id":                       observation.ID,
-		"contract_id":              observation.ContractID,
-		"provider_name":            observation.ProviderName,
-		"station_id":               observation.StationID,
-		"observed_metric":          observation.ObservedMetric,
-		"observation_window_start": observation.ObservationWindowStart.UTC().Format(time.RFC3339),
-		"observation_window_end":   observation.ObservationWindowEnd.UTC().Format(time.RFC3339),
-		"observed_value":           observation.ObservedValue,
-		"normalized_value":         observation.NormalizedValue,
-		"observed_at":              observation.ObservedAt.UTC().Format(time.RFC3339),
-		"recorded_at":              observation.RecordedAt.UTC().Format(time.RFC3339),
+func serializeOracleObservation(observation domain.OracleObservation) oracleObservationResponse {
+	return oracleObservationResponse{
+		ID:                     observation.ID,
+		ContractID:             observation.ContractID,
+		ProviderName:           observation.ProviderName,
+		StationID:              observation.StationID,
+		ObservedMetric:         observation.ObservedMetric,
+		ObservationWindowStart: observation.ObservationWindowStart.UTC().Format(time.RFC3339),
+		ObservationWindowEnd:   observation.ObservationWindowEnd.UTC().Format(time.RFC3339),
+		ObservedValue:          observation.ObservedValue,
+		NormalizedValue:        observation.NormalizedValue,
+		ObservedAt:             observation.ObservedAt.UTC().Format(time.RFC3339),
+		RecordedAt:             observation.RecordedAt.UTC().Format(time.RFC3339),
 	}
 }
 
-func serializeContractResolution(resolution domain.ContractResolution) map[string]any {
-	return map[string]any{
-		"id":                       resolution.ID,
-		"contract_id":              resolution.ContractID,
-		"provider_name":            resolution.ProviderName,
-		"station_id":               resolution.StationID,
-		"observed_metric":          resolution.ObservedMetric,
-		"observation_window_start": resolution.ObservationWindowStart.UTC().Format(time.RFC3339),
-		"observation_window_end":   resolution.ObservationWindowEnd.UTC().Format(time.RFC3339),
-		"rule_version":             resolution.RuleVersion,
-		"resolved_value":           resolution.ResolvedValue,
-		"outcome":                  resolution.Outcome,
-		"resolved_at":              resolution.ResolvedAt.UTC().Format(time.RFC3339),
+func serializeContractResolution(resolution domain.ContractResolution) contractResolutionResponse {
+	return contractResolutionResponse{
+		ID:                     resolution.ID,
+		ContractID:             resolution.ContractID,
+		ProviderName:           resolution.ProviderName,
+		StationID:              resolution.StationID,
+		ObservedMetric:         resolution.ObservedMetric,
+		ObservationWindowStart: resolution.ObservationWindowStart.UTC().Format(time.RFC3339),
+		ObservationWindowEnd:   resolution.ObservationWindowEnd.UTC().Format(time.RFC3339),
+		RuleVersion:            resolution.RuleVersion,
+		ResolvedValue:          resolution.ResolvedValue,
+		Outcome:                string(resolution.Outcome),
+		ResolvedAt:             resolution.ResolvedAt.UTC().Format(time.RFC3339),
 	}
 }
 
-func serializeExecution(execution domain.Execution) map[string]any {
-	return map[string]any{
-		"id":             execution.ID,
-		"execution_id":   execution.ExecutionID,
-		"contract_id":    execution.ContractID,
-		"buy_order_id":   execution.BuyOrderID,
-		"sell_order_id":  execution.SellOrderID,
-		"buyer_user_id":  execution.BuyerUserID,
-		"seller_user_id": execution.SellerUserID,
-		"price":          execution.Price,
-		"quantity":       execution.Quantity,
-		"sequence":       execution.Sequence,
-		"occurred_at":    execution.OccurredAt.UTC().Format(time.RFC3339),
+func serializeExecution(execution domain.Execution) executionResponse {
+	return executionResponse{
+		ID:           execution.ID,
+		ExecutionID:  execution.ExecutionID,
+		ContractID:   execution.ContractID,
+		BuyOrderID:   execution.BuyOrderID,
+		SellOrderID:  execution.SellOrderID,
+		BuyerUserID:  execution.BuyerUserID,
+		SellerUserID: execution.SellerUserID,
+		Price:        execution.Price,
+		Quantity:     execution.Quantity,
+		Sequence:     execution.Sequence,
+		OccurredAt:   execution.OccurredAt.UTC().Format(time.RFC3339),
 	}
 }
 
-func serializeOrder(order domain.Order) map[string]any {
-	return map[string]any{
-		"id":          order.ID,
-		"contract_id": order.ContractID,
-		"user_id":     order.UserID,
-		"token_type":  order.TokenType,
-		"order_side":  order.OrderSide,
-		"price":       order.Price,
-		"quantity":    order.Quantity,
-		"status":      order.Status,
+func serializeOrder(order domain.Order) orderResponse {
+	return orderResponse{
+		ID:         order.ID,
+		ContractID: order.ContractID,
+		UserID:     order.UserID,
+		TokenType:  order.TokenType,
+		OrderSide:  order.OrderSide,
+		Price:      order.Price,
+		Quantity:   order.Quantity,
+		Status:     order.Status,
 	}
 }
 
-func serializePlaceOrderResult(result commands.PlaceOrderResult) map[string]any {
-	payload := map[string]any{
-		"status":      result.Status,
-		"contract_id": result.ContractID,
-		"executions":  serializeExecutions(result.Executions),
-	}
-	if result.Order != nil {
-		payload["order"] = serializeOrder(*result.Order)
-	}
-
-	return payload
-}
-
-func serializePlaceOrderAccepted(result commands.PlaceOrderAccepted) map[string]any {
-	return map[string]any{
-		"command_id":  result.CommandID,
-		"contract_id": result.ContractID,
-		"partition":   result.Partition,
-		"status":      result.Status,
-		"enqueued_at": result.EnqueuedAt.UTC().Format(time.RFC3339),
+func serializePlaceOrderAccepted(result commands.PlaceOrderAccepted) placeOrderAcceptedResponse {
+	return placeOrderAcceptedResponse{
+		CommandID:  result.CommandID,
+		ContractID: result.ContractID,
+		Partition:  result.Partition,
+		Status:     result.Status,
+		EnqueuedAt: result.EnqueuedAt.UTC().Format(time.RFC3339),
 	}
 }
 
-func serializeCreateContractAccepted(result commands.CreateContractAccepted) map[string]any {
-	return map[string]any{
-		"command_id":  result.CommandID,
-		"partition":   result.Partition,
-		"status":      result.Status,
-		"enqueued_at": result.EnqueuedAt.UTC().Format(time.RFC3339),
+type placeOrderAcceptedResponse struct {
+	CommandID  string `json:"command_id"`
+	ContractID int64  `json:"contract_id"`
+	Partition  int    `json:"partition"`
+	Status     string `json:"status"`
+	EnqueuedAt string `json:"enqueued_at"`
+}
+
+func serializeCreateContractAccepted(result commands.CreateContractAccepted) createContractAcceptedResponse {
+	return createContractAcceptedResponse{
+		CommandID:  result.CommandID,
+		Partition:  result.Partition,
+		Status:     result.Status,
+		EnqueuedAt: result.EnqueuedAt.UTC().Format(time.RFC3339),
 	}
 }
 
-func serializeOrderCommand(command commands.OrderCommand) map[string]any {
-	return map[string]any{
-		"command_id":      command.CommandID,
-		"contract_id":     command.ContractID,
-		"user_id":         command.UserID,
-		"token_type":      command.TokenType,
-		"order_side":      command.OrderSide,
-		"price":           command.Price,
-		"quantity":        command.Quantity,
-		"status":          command.Status,
-		"error_message":   command.ErrorMessage,
-		"result_status":   command.ResultStatus,
-		"result_order_id": command.ResultOrderID,
-		"enqueued_at":     command.EnqueuedAt.UTC().Format(time.RFC3339),
-		"started_at":      timestampRFC3339(command.StartedAt),
-		"completed_at":    timestampRFC3339(command.CompletedAt),
-		"updated_at":      command.UpdatedAt.UTC().Format(time.RFC3339),
+type createContractAcceptedResponse struct {
+	CommandID  string `json:"command_id"`
+	Partition  int    `json:"partition"`
+	Status     string `json:"status"`
+	EnqueuedAt string `json:"enqueued_at"`
+}
+
+func serializeOrderCommand(command commands.OrderCommand) orderCommandResponse {
+	return orderCommandResponse{
+		CommandID:     command.CommandID,
+		ContractID:    command.ContractID,
+		UserID:        command.UserID,
+		TokenType:     command.TokenType,
+		OrderSide:     command.OrderSide,
+		Price:         command.Price,
+		Quantity:      command.Quantity,
+		Status:        command.Status,
+		ErrorMessage:  command.ErrorMessage,
+		ResultStatus:  command.ResultStatus,
+		ResultOrderID: command.ResultOrderID,
+		EnqueuedAt:    command.EnqueuedAt.UTC().Format(time.RFC3339),
+		StartedAt:     timestampRFC3339(command.StartedAt),
+		CompletedAt:   timestampRFC3339(command.CompletedAt),
+		UpdatedAt:     command.UpdatedAt.UTC().Format(time.RFC3339),
 	}
 }
 
-func serializeContractCommand(command commands.ContractCommand) map[string]any {
-	return map[string]any{
-		"command_id":                 command.CommandID,
-		"creator_user_id":            command.CreatorUserID,
-		"name":                       command.Name,
-		"region":                     command.Region,
-		"metric":                     command.Metric,
-		"status":                     command.Status,
-		"threshold":                  command.Threshold,
-		"multiplier":                 command.Multiplier,
-		"measurement_unit":           command.MeasurementUnit,
-		"trading_period_start":       dateString(command.TradingPeriodStart),
-		"trading_period_end":         dateString(command.TradingPeriodEnd),
-		"measurement_period_start":   dateString(command.MeasurementPeriodStart),
-		"measurement_period_end":     dateString(command.MeasurementPeriodEnd),
-		"data_provider_name":         command.DataProviderName,
-		"station_id":                 command.StationID,
-		"data_provider_station_mode": command.DataProviderStationMode,
-		"description":                command.Description,
-		"command_status":             command.CommandStatus,
-		"error_message":              command.ErrorMessage,
-		"result_contract_id":         command.ResultContractID,
-		"enqueued_at":                command.EnqueuedAt.UTC().Format(time.RFC3339),
-		"started_at":                 timestampRFC3339(command.StartedAt),
-		"completed_at":               timestampRFC3339(command.CompletedAt),
-		"updated_at":                 command.UpdatedAt.UTC().Format(time.RFC3339),
+func serializeContractCommand(command commands.ContractCommand) contractCommandResponse {
+	return contractCommandResponse{
+		CommandID:                 command.CommandID,
+		CreatorUserID:             command.CreatorUserID,
+		Name:                      command.Name,
+		Region:                    command.Region,
+		Metric:                    command.Metric,
+		Status:                    command.Status,
+		Threshold:                 command.Threshold,
+		Multiplier:                command.Multiplier,
+		MeasurementUnit:           command.MeasurementUnit,
+		TradingPeriodStart:        dateString(command.TradingPeriodStart),
+		TradingPeriodEnd:          dateString(command.TradingPeriodEnd),
+		MeasurementPeriodStart:    dateString(command.MeasurementPeriodStart),
+		MeasurementPeriodEnd:      dateString(command.MeasurementPeriodEnd),
+		DataProviderName:          command.DataProviderName,
+		StationID:                 command.StationID,
+		DataProviderStationMode:   command.DataProviderStationMode,
+		Description:               command.Description,
+		CommandStatus:             command.CommandStatus,
+		ErrorMessage:              command.ErrorMessage,
+		ResultContractID:          command.ResultContractID,
+		EnqueuedAt:                command.EnqueuedAt.UTC().Format(time.RFC3339),
+		StartedAt:                 timestampRFC3339(command.StartedAt),
+		CompletedAt:               timestampRFC3339(command.CompletedAt),
+		UpdatedAt:                 command.UpdatedAt.UTC().Format(time.RFC3339),
 	}
 }
 
-func serializeMarketState(marketState domain.MarketState) map[string]any {
-	return map[string]any{
-		"contract_id": marketState.ContractID,
-		"sequence":    marketState.Sequence,
-		"as_of":       timestampString(marketState.AsOf),
-		"order_book": map[string]any{
-			"above": map[string]any{
-				"bid": serializeLevels(marketState.OrderBook.Above.Bid),
-				"ask": serializeLevels(marketState.OrderBook.Above.Ask),
+type contractCommandResponse struct {
+	CommandID               string  `json:"command_id"`
+	CreatorUserID           int64   `json:"creator_user_id"`
+	Name                    string  `json:"name"`
+	Region                  string  `json:"region"`
+	Metric                  string  `json:"metric"`
+	Status                  string  `json:"status"`
+	Threshold               *int64  `json:"threshold"`
+	Multiplier              *int64  `json:"multiplier"`
+	MeasurementUnit         *string `json:"measurement_unit"`
+	TradingPeriodStart      *string `json:"trading_period_start"`
+	TradingPeriodEnd        *string `json:"trading_period_end"`
+	MeasurementPeriodStart  *string `json:"measurement_period_start"`
+	MeasurementPeriodEnd    *string `json:"measurement_period_end"`
+	DataProviderName        *string `json:"data_provider_name"`
+	StationID               *string `json:"station_id"`
+	DataProviderStationMode *string `json:"data_provider_station_mode"`
+	Description             *string `json:"description"`
+	CommandStatus           string  `json:"command_status"`
+	ErrorMessage            *string `json:"error_message"`
+	ResultContractID        *int64  `json:"result_contract_id"`
+	EnqueuedAt              string  `json:"enqueued_at"`
+	StartedAt               *string `json:"started_at"`
+	CompletedAt             *string `json:"completed_at"`
+	UpdatedAt               string  `json:"updated_at"`
+}
+
+func serializeMarketState(marketState domain.MarketState) marketStateResponse {
+	return marketStateResponse{
+		ContractID: marketState.ContractID,
+		Sequence:   marketState.Sequence,
+		AsOf:       timestampString(marketState.AsOf),
+		OrderBook: marketOrderBookResponse{
+			Above: marketBookSideResponse{
+				Bid: serializeLevels(marketState.OrderBook.Above.Bid),
+				Ask: serializeLevels(marketState.OrderBook.Above.Ask),
 			},
-			"below": map[string]any{
-				"bid": serializeLevels(marketState.OrderBook.Below.Bid),
-				"ask": serializeLevels(marketState.OrderBook.Below.Ask),
+			Below: marketBookSideResponse{
+				Bid: serializeLevels(marketState.OrderBook.Below.Bid),
+				Ask: serializeLevels(marketState.OrderBook.Below.Ask),
 			},
 		},
-		"summary": map[string]any{
-			"best": map[string]any{
-				"above": map[string]any{
-					"bid": marketState.Summary.Best.Above.Bid,
-					"ask": marketState.Summary.Best.Above.Ask,
+		Summary: marketSummaryResponse{
+			Best: marketBestResponse{
+				Above: marketQuoteResponse{
+					Bid: marketState.Summary.Best.Above.Bid,
+					Ask: marketState.Summary.Best.Above.Ask,
 				},
-				"below": map[string]any{
-					"bid": marketState.Summary.Best.Below.Bid,
-					"ask": marketState.Summary.Best.Below.Ask,
+				Below: marketQuoteResponse{
+					Bid: marketState.Summary.Best.Below.Bid,
+					Ask: marketState.Summary.Best.Below.Ask,
 				},
 			},
-			"mid": map[string]any{
-				"above": marketState.Summary.Mid.Above,
-				"below": marketState.Summary.Mid.Below,
+			Mid: marketMidResponse{
+				Above: marketState.Summary.Mid.Above,
+				Below: marketState.Summary.Mid.Below,
 			},
-			"liquidity": map[string]any{
-				"above": marketState.Summary.Liquidity.Above,
-				"below": marketState.Summary.Liquidity.Below,
+			Liquidity: marketLiquidityResponse{
+				Above: marketState.Summary.Liquidity.Above,
+				Below: marketState.Summary.Liquidity.Below,
 			},
-			"above_below_bid_gap": marketState.Summary.AboveBelowBidGap,
+			AboveBelowBidGap: marketState.Summary.AboveBelowBidGap,
 		},
 	}
 }
 
-func serializeChartPoints(points []domain.ChartPoint) []map[string]any {
-	rows := make([]map[string]any, 0, len(points))
+func serializeChartPoints(points []domain.ChartPoint) []chartPointResponse {
+	rows := make([]chartPointResponse, 0, len(points))
 	for _, point := range points {
-		rows = append(rows, serializeChartPoint(point))
-	}
-
-	return rows
-}
-
-func serializeChartPoint(point domain.ChartPoint) map[string]any {
-	return map[string]any{
-		"bucket_start": point.BucketStart.UTC().Format(time.RFC3339[:19]),
-		"inserted_at":  point.InsertedAt.UTC().Format(time.RFC3339[:19]),
-		"mid_above":    point.MidAbove,
-		"mid_below":    point.MidBelow,
-		"best_above":   point.BestAbove,
-		"best_below":   point.BestBelow,
-	}
-}
-
-func serializeLevels(levels []domain.PriceLevel) []map[string]any {
-	rows := make([]map[string]any, 0, len(levels))
-	for _, level := range levels {
-		rows = append(rows, map[string]any{
-			"price":    level.Price,
-			"quantity": level.Quantity,
+		rows = append(rows, chartPointResponse{
+			BucketStart: point.BucketStart.UTC().Format(time.RFC3339[:19]),
+			InsertedAt:  point.InsertedAt.UTC().Format(time.RFC3339[:19]),
+			MidAbove:    point.MidAbove,
+			MidBelow:    point.MidBelow,
+			BestAbove:   point.BestAbove,
+			BestBelow:   point.BestBelow,
 		})
 	}
 
 	return rows
 }
 
-func timestampString(value *time.Time) any {
+func serializeLevels(levels []domain.PriceLevel) []priceLevelResponse {
+	rows := make([]priceLevelResponse, 0, len(levels))
+	for _, level := range levels {
+		rows = append(rows, priceLevelResponse{
+			Price:    level.Price,
+			Quantity: level.Quantity,
+		})
+	}
+
+	return rows
+}
+
+func timestampString(value *time.Time) *string {
 	if value == nil {
 		return nil
 	}
 
-	return value.UTC().Format("2006-01-02T15:04:05")
+	formatted := value.UTC().Format("2006-01-02T15:04:05")
+	return &formatted
 }
 
-func dateString(value *time.Time) any {
+func dateString(value *time.Time) *string {
 	if value == nil {
 		return nil
 	}
 
-	return value.UTC().Format("2006-01-02")
+	formatted := value.UTC().Format("2006-01-02")
+	return &formatted
 }
 
-func timestampRFC3339(value *time.Time) any {
+func timestampRFC3339(value *time.Time) *string {
 	if value == nil {
 		return nil
 	}
 
-	return value.UTC().Format(time.RFC3339)
+	formatted := value.UTC().Format(time.RFC3339)
+	return &formatted
 }
 
-func blankToNil(value string) any {
+func stringOrNil(value string) *string {
 	if value == "" {
 		return nil
 	}
-
-	return value
+	copy := value
+	return &copy
 }

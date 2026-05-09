@@ -12,6 +12,7 @@ import (
 
 type stubExchangeCoreRepository struct {
 	processCreateContractFn       func(context.Context, commands.CreateContractEnvelope) (commands.CreateContractResult, error)
+	findDuplicateContractFn       func(context.Context, store.FindDuplicateContractInput) (*domain.Contract, error)
 	getContractCommandFn          func(context.Context, string) (*commands.ContractCommand, error)
 	getContractFn                 func(context.Context, int64) (*domain.Contract, error)
 	getContractRuleFn             func(context.Context, int64) (*domain.ContractRule, error)
@@ -25,6 +26,7 @@ type stubExchangeCoreRepository struct {
 	releaseCollateralLockFn       func(context.Context, store.ReleaseCollateralLockInput) (*domain.CollateralLock, *domain.CashAccount, *domain.LedgerEntry, error)
 	createCollateralLockFn        func(context.Context, store.CreateCollateralLockInput) (*domain.CollateralLock, *domain.CashAccount, *domain.LedgerEntry, error)
 	createIssuanceBatchFn         func(context.Context, store.CreateIssuanceBatchInput) (*domain.IssuanceBatch, *domain.CollateralLock, []*domain.Position, error)
+	listCashAccountsFn            func(context.Context, int64) ([]domain.CashAccount, error)
 	listPositionsFn               func(context.Context, int64, *int64) ([]domain.Position, error)
 	listPositionLocksFn           func(context.Context, int64, *int64) ([]domain.PositionLock, error)
 	getCashAccountFn              func(context.Context, int64, string) (*domain.CashAccount, error)
@@ -55,6 +57,13 @@ func (s stubExchangeCoreRepository) ProcessCreateContract(ctx context.Context, e
 		return s.processCreateContractFn(ctx, envelope)
 	}
 	return commands.CreateContractResult{}, nil
+}
+
+func (s stubExchangeCoreRepository) FindDuplicateContract(ctx context.Context, input store.FindDuplicateContractInput) (*domain.Contract, error) {
+	if s.findDuplicateContractFn != nil {
+		return s.findDuplicateContractFn(ctx, input)
+	}
+	return nil, nil
 }
 
 func (s stubExchangeCoreRepository) GetContractCommand(ctx context.Context, commandID string) (*commands.ContractCommand, error) {
@@ -109,6 +118,13 @@ func (s stubExchangeCoreRepository) CreateIssuanceBatch(ctx context.Context, inp
 func (s stubExchangeCoreRepository) ListPositions(ctx context.Context, userID int64, contractID *int64) ([]domain.Position, error) {
 	if s.listPositionsFn != nil {
 		return s.listPositionsFn(ctx, userID, contractID)
+	}
+	return nil, nil
+}
+
+func (s stubExchangeCoreRepository) ListCashAccounts(ctx context.Context, userID int64) ([]domain.CashAccount, error) {
+	if s.listCashAccountsFn != nil {
+		return s.listCashAccountsFn(ctx, userID)
 	}
 	return nil, nil
 }

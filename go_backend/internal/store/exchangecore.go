@@ -11,6 +11,7 @@ import (
 
 type ExchangeCoreRepository interface {
 	ProcessCreateContract(ctx context.Context, envelope commands.CreateContractEnvelope) (commands.CreateContractResult, error)
+	FindDuplicateContract(ctx context.Context, input FindDuplicateContractInput) (*domain.Contract, error)
 	GetContractCommand(ctx context.Context, commandID string) (*commands.ContractCommand, error)
 	GetContract(ctx context.Context, contractID int64) (*domain.Contract, error)
 	GetContractRule(ctx context.Context, contractID int64) (*domain.ContractRule, error)
@@ -20,6 +21,7 @@ type ExchangeCoreRepository interface {
 	CreateIssuanceBatch(ctx context.Context, input CreateIssuanceBatchInput) (*domain.IssuanceBatch, *domain.CollateralLock, []*domain.Position, error)
 	ListPositions(ctx context.Context, userID int64, contractID *int64) ([]domain.Position, error)
 	ListPositionLocks(ctx context.Context, userID int64, contractID *int64) ([]domain.PositionLock, error)
+	ListCashAccounts(ctx context.Context, userID int64) ([]domain.CashAccount, error)
 	ListSettlementEntriesByContract(ctx context.Context, contractID int64, limit int) ([]domain.SettlementEntry, error)
 	ListSettlementEntriesByUser(ctx context.Context, userID int64, contractID *int64, limit int) ([]domain.SettlementEntry, error)
 	CreatePositionLock(ctx context.Context, input CreatePositionLockInput) (*domain.PositionLock, *domain.Position, error)
@@ -98,6 +100,17 @@ type CreateIssuanceBatchInput struct {
 	PairedQuantity   int64
 }
 
+type FindDuplicateContractInput struct {
+	ProviderName           string
+	StationID              string
+	Metric                 string
+	Threshold              *int64
+	TradingPeriodStart     string
+	TradingPeriodEnd       string
+	MeasurementPeriodStart string
+	MeasurementPeriodEnd   string
+}
+
 type CreatePositionLockInput struct {
 	UserID        int64
 	ContractID    int64
@@ -118,6 +131,7 @@ type ReleasePositionLockInput struct {
 
 type SettleContractInput struct {
 	ContractID    int64
+	EventID       string
 	Outcome       string
 	ResolvedAt    string
 	CorrelationID string

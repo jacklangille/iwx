@@ -12,6 +12,7 @@ Current Go runtime pieces:
 
 - `cmd/auth`
 - `cmd/read-api`
+- `cmd/projector`
 - `cmd/exchange-core`
 - `cmd/matcher`
 - `cmd/oracle`
@@ -24,9 +25,11 @@ Important architecture notes:
 - matcher currently owns order matching, executions, and market snapshots
 - exchange-core currently owns contract lifecycle, contract rules, and contract command state
 - oracle now owns weather observations and final contract resolution records
+- projector is now the only writer to `read-db`
 - matcher now publishes `execution_created` events after successful fills
 - exchange-core now consumes `execution_created` to apply balance and position changes
-- read-api now consumes `execution_created` to refresh market projections and invalidate hot cache entries
+- exchange-core, matcher, and oracle now publish `projection_change` events instead of emitting read-model payloads
+- projector consumes `projection_change` and writes `read-db`
 - settlement now consumes `contract_resolved` events and settles contracts against exchange-core balances and positions
 - read-api now serves both market reads and user dashboard projections from `read-db`
 - authenticated writes now carry `user_id` / `creator_user_id` through the Go services
@@ -48,6 +51,7 @@ This now starts:
 - `auth`
 - `exchange-core`
 - `read-api`
+- `projector`
 - `matcher`
 - `oracle`
 - `settlement`
@@ -58,12 +62,14 @@ Useful local endpoints:
 - auth: `http://127.0.0.1:8081`
 - exchange-core: `http://127.0.0.1:8082`
 - oracle: `http://127.0.0.1:8083`
+- matcher internal HTTP: `http://127.0.0.1:8084`
 
 If you want to run the Go processes manually instead of through Compose:
 
 ```powershell
 cd go_backend
 go run .\cmd\read-api
+go run .\cmd\projector
 go run .\cmd\exchange-core
 go run .\cmd\matcher
 go run .\cmd\auth
@@ -126,9 +132,6 @@ Authenticated write endpoints currently are:
 - `GET /api/me/cash_reservations`
 - `GET /api/me/portfolio`
 - `GET /api/me/settlements`
-- `GET /api/stream/contracts/:id/market`
-- `GET /api/stream/me/order_commands/:id`
-- `GET /api/stream/me/portfolio`
 - internal oracle endpoints live on `cmd/oracle`:
   - `POST /api/oracle/observations`
   - `GET /api/oracle/contracts/:id/observations`
@@ -143,6 +146,8 @@ Operational notes:
 - Go service logs now emit JSON lines to stdout and per-service log files.
 - HTTP services return `X-Request-ID`, `X-Trace-ID`, and `X-Correlation-ID`.
 - Order, oracle-resolution, and settlement flows now propagate trace IDs across service boundaries.
+- The React UI now polls normal JSON endpoints directly; there is no SSE layer in the current runtime.
+- `read-api` is query-only again; the projector owns read-model writes.
 
 ## Planning Docs
 

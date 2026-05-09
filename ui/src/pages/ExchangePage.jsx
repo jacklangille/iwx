@@ -2,10 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import { MarketChart } from "../components/MarketChart";
-import { RegionMapPanel } from "../components/RegionMapPanel";
 import { TradeRail } from "../components/TradeRail";
 import {
-  contractMarketStreamUrl,
   getMarketSnapshots,
   getMarketState,
   getOrderCommand,
@@ -66,18 +64,21 @@ export function ExchangePage() {
     queryKey: ["market-state", contractId],
     queryFn: () => getMarketState(contractId),
     enabled: Boolean(contractId),
+    refetchInterval: contractId ? 2_000 : false,
   });
 
   const chartQuery = useQuery({
     queryKey: ["market-chart", contractId, chartConfig.lookbackSeconds, chartConfig.bucketSeconds],
     queryFn: () => getMarketSnapshots(contractId, chartConfig),
     enabled: Boolean(contractId),
+    refetchInterval: contractId ? 5_000 : false,
   });
 
   const portfolioQuery = useQuery({
     queryKey: ["portfolio", token],
     queryFn: () => getPortfolio(token),
     enabled: isAuthenticated,
+    refetchInterval: isAuthenticated ? 5_000 : false,
   });
 
   const orderCommandQuery = useQuery({
@@ -91,22 +92,6 @@ export function ExchangePage() {
       return false;
     },
   });
-
-  useEffect(() => {
-    if (!contractId) return undefined;
-
-    const source = new EventSource(contractMarketStreamUrl(contractId));
-    source.addEventListener("update", (event) => {
-      try {
-        const payload = JSON.parse(event.data);
-        if (payload.market_state) {
-          queryClient.setQueryData(["market-state", contractId], payload.market_state);
-        }
-      } catch (_error) {
-      }
-    });
-    return () => source.close();
-  }, [contractId, queryClient]);
 
   useEffect(() => {
     const status = String(orderCommandQuery.data?.status || "").toLowerCase();
@@ -206,7 +191,6 @@ export function ExchangePage() {
               })
             }
           />
-          <RegionMapPanel contract={contractView} />
         </div>
       </div>
 

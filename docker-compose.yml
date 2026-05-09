@@ -9,10 +9,12 @@ x-backend-env: &backend-env
   IWX_NATS_URL: nats://nats:4222
   IWX_NATS_STREAM_PLACE_ORDER: IWX_PLACE_ORDER
   IWX_NATS_STREAM_EXECUTION_CREATED: IWX_EXECUTION_CREATED
+  IWX_NATS_STREAM_PROJECTION_CHANGE: IWX_PROJECTION_CHANGE
   IWX_NATS_STREAM_CONTRACT_RESOLVED: IWX_CONTRACT_RESOLVED
   IWX_NATS_STREAM_SETTLEMENT_COMPLETED: IWX_SETTLEMENT_COMPLETED
   IWX_NATS_SUBJECT_PLACE_ORDER: iwx.matcher.place_order
   IWX_NATS_SUBJECT_EXECUTION_CREATED: iwx.matcher.execution_created
+  IWX_NATS_SUBJECT_PROJECTION_CHANGE: iwx.read.change
   IWX_NATS_SUBJECT_CONTRACT_RESOLVED: iwx.oracle.contract_resolved
   IWX_NATS_SUBJECT_SETTLEMENT_COMPLETED: iwx.settlement.completed
   IWX_AUTH_JWT_SECRET: replace-with-a-long-random-secret
@@ -92,53 +94,18 @@ services:
       timeout: 5s
       retries: 12
 
-  matcher-postgres-0:
-    image: bitnamilegacy/postgresql-repmgr:17.6.0
-    container_name: iwx-matcher-postgres-0
+  matcher-postgres:
+    image: postgres:16
+    container_name: iwx-matcher-postgres
     restart: unless-stopped
     environment:
-      POSTGRESQL_POSTGRES_PASSWORD: postgres
-      POSTGRESQL_USERNAME: matcher_app
-      POSTGRESQL_PASSWORD: matcher_app
-      POSTGRESQL_DATABASE: matcher
-      REPMGR_PASSWORD: repmgr
-      REPMGR_PRIMARY_HOST: matcher-postgres-0
-      REPMGR_PARTNER_NODES: matcher-postgres-0,matcher-postgres-1
-      REPMGR_NODE_NAME: matcher-postgres-0
-      REPMGR_NODE_NETWORK_NAME: matcher-postgres-0
-      REPMGR_NODE_ID: 1000
+      POSTGRES_USER: matcher_app
+      POSTGRES_PASSWORD: matcher_app
+      POSTGRES_DB: matcher
     ports:
       - "5434:5432"
     volumes:
-      - matcher_primary_data:/bitnami/postgresql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U matcher_app -d matcher"]
-      interval: 5s
-      timeout: 5s
-      retries: 12
-
-  matcher-postgres-1:
-    image: bitnamilegacy/postgresql-repmgr:17.6.0
-    container_name: iwx-matcher-postgres-1
-    restart: unless-stopped
-    depends_on:
-      matcher-postgres-0:
-        condition: service_healthy
-    environment:
-      POSTGRESQL_POSTGRES_PASSWORD: postgres
-      POSTGRESQL_USERNAME: matcher_app
-      POSTGRESQL_PASSWORD: matcher_app
-      POSTGRESQL_DATABASE: matcher
-      REPMGR_PASSWORD: repmgr
-      REPMGR_PRIMARY_HOST: matcher-postgres-0
-      REPMGR_PARTNER_NODES: matcher-postgres-0,matcher-postgres-1
-      REPMGR_NODE_NAME: matcher-postgres-1
-      REPMGR_NODE_NETWORK_NAME: matcher-postgres-1
-      REPMGR_NODE_ID: 1001
-    ports:
-      - "5435:5432"
-    volumes:
-      - matcher_replica_data:/bitnami/postgresql
+      - matcher_postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U matcher_app -d matcher"]
       interval: 5s
@@ -185,11 +152,9 @@ services:
       <<: *backend-env
       IWX_EXCHANGE_CORE_HTTP_ADDR: :8082
       IWX_EXCHANGE_CORE_DATABASE_URL: postgres://exchange_core_app:exchange_core_app@exchange-core-postgres:5432/exchange_core?sslmode=disable
-      IWX_READ_DATABASE_URL: postgres://read_app:read_app@read-postgres:5432/read?sslmode=disable
+      IWX_ORACLE_SERVICE_URL: http://oracle:8083
     depends_on:
       exchange-core-postgres:
-        condition: service_healthy
-      read-postgres:
         condition: service_healthy
       nats:
         condition: service_healthy
@@ -204,16 +169,8 @@ services:
       <<: *backend-env
       IWX_HTTP_ADDR: :8080
       IWX_READ_DATABASE_URL: postgres://read_app:read_app@read-postgres:5432/read?sslmode=disable
-      IWX_EXCHANGE_CORE_DATABASE_URL: postgres://exchange_core_app:exchange_core_app@exchange-core-postgres:5432/exchange_core?sslmode=disable
-      IWX_MATCHER_DATABASE_URL: postgres://matcher_app:matcher_app@matcher-postgres-0:5432/matcher?sslmode=disable
     depends_on:
       read-postgres:
-        condition: service_healthy
-      exchange-core-postgres:
-        condition: service_healthy
-      matcher-postgres-0:
-        condition: service_healthy
-      nats:
         condition: service_healthy
     ports:
       - "8080:8080"
@@ -224,18 +181,19 @@ services:
     command: ["go", "run", "./cmd/matcher"]
     environment:
       <<: *backend-env
-      IWX_MATCHER_DATABASE_URL: postgres://matcher_app:matcher_app@matcher-postgres-0:5432/matcher?sslmode=disable
-      IWX_READ_DATABASE_URL: postgres://read_app:read_app@read-postgres:5432/read?sslmode=disable
+      IWX_MATCHER_HTTP_ADDR: :8084
+      IWX_MATCHER_SERVICE_URL: http://matcher:8084
+      IWX_MATCHER_DATABASE_URL: postgres://matcher_app:matcher_app@matcher-postgres:5432/matcher?sslmode=disable
       IWX_MATCHER_PARTITION_COUNT: "16"
       IWX_MATCHER_OWNED_PARTITIONS: 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
       IWX_MATCHER_INSTANCE_ID: matcher-compose
     depends_on:
-      matcher-postgres-0:
-        condition: service_healthy
-      read-postgres:
+      matcher-postgres:
         condition: service_healthy
       nats:
         condition: service_healthy
+    ports:
+      - "8084:8084"
 
   oracle:
     <<: *go-service
@@ -245,14 +203,9 @@ services:
       <<: *backend-env
       IWX_ORACLE_HTTP_ADDR: :8083
       IWX_ORACLE_DATABASE_URL: postgres://oracle_app:oracle_app@oracle-postgres:5432/oracle?sslmode=disable
-      IWX_EXCHANGE_CORE_DATABASE_URL: postgres://exchange_core_app:exchange_core_app@exchange-core-postgres:5432/exchange_core?sslmode=disable
-      IWX_READ_DATABASE_URL: postgres://read_app:read_app@read-postgres:5432/read?sslmode=disable
+      IWX_EXCHANGE_CORE_SERVICE_URL: http://exchange-core:8082
     depends_on:
       oracle-postgres:
-        condition: service_healthy
-      exchange-core-postgres:
-        condition: service_healthy
-      read-postgres:
         condition: service_healthy
       nats:
         condition: service_healthy
@@ -265,14 +218,32 @@ services:
     command: ["go", "run", "./cmd/settlement"]
     environment:
       <<: *backend-env
-      IWX_EXCHANGE_CORE_DATABASE_URL: postgres://exchange_core_app:exchange_core_app@exchange-core-postgres:5432/exchange_core?sslmode=disable
-      IWX_READ_DATABASE_URL: postgres://read_app:read_app@read-postgres:5432/read?sslmode=disable
+      IWX_EXCHANGE_CORE_SERVICE_URL: http://exchange-core:8082
       IWX_SETTLEMENT_INSTANCE_ID: settlement-compose
     depends_on:
-      exchange-core-postgres:
+      nats:
         condition: service_healthy
+
+  projector:
+    <<: *go-service
+    container_name: iwx-projector
+    command: ["go", "run", "./cmd/projector"]
+    environment:
+      <<: *backend-env
+      IWX_PROJECTOR_INSTANCE_ID: projector-compose
+      IWX_READ_DATABASE_URL: postgres://read_app:read_app@read-postgres:5432/read?sslmode=disable
+      IWX_EXCHANGE_CORE_SERVICE_URL: http://exchange-core:8082
+      IWX_MATCHER_SERVICE_URL: http://matcher:8084
+      IWX_ORACLE_SERVICE_URL: http://oracle:8083
+    depends_on:
       read-postgres:
         condition: service_healthy
+      exchange-core:
+        condition: service_started
+      matcher:
+        condition: service_started
+      oracle:
+        condition: service_started
       nats:
         condition: service_healthy
 
@@ -281,6 +252,5 @@ volumes:
   exchange_core_postgres_data:
   oracle_postgres_data:
   read_postgres_data:
-  matcher_primary_data:
-  matcher_replica_data:
+  matcher_postgres_data:
   nats_data:

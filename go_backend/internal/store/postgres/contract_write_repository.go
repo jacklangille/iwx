@@ -42,7 +42,7 @@ func executeCreateContract(
 ) (commands.CreateContractResult, error) {
 	contract, err := insertContract(ctx, tx, command)
 	if err != nil {
-		return commands.CreateContractResult{}, err
+		return commands.CreateContractResult{}, translateDuplicateContractError(err)
 	}
 	if err := insertContractRule(ctx, tx, *contract, command); err != nil {
 		return commands.CreateContractResult{}, err
@@ -113,7 +113,8 @@ func insertContract(ctx context.Context, tx *sql.Tx, command commands.CreateCont
 			data_provider_name,
 			station_id,
 			data_provider_station_mode,
-			description
+			description,
+			updated_at
 	`,
 		strings.TrimSpace(command.Name),
 		command.CreatorUserID,

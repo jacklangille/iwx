@@ -22,7 +22,7 @@ func TestHandleContractResolvedUsesTraceIDAsCorrelationID(t *testing.T) {
 			captured = input
 			return &store.SettlementResult{SettledAt: settledAt}, nil
 		},
-	}, nil, publisher)
+	}, publisher)
 
 	_, err := service.HandleContractResolved(context.Background(), events.ContractResolved{
 		ContractID: 17,
@@ -51,7 +51,7 @@ func TestHandleContractResolvedFallsBackToGeneratedCorrelationID(t *testing.T) {
 			captured = input
 			return &store.SettlementResult{SettledAt: resolvedAt}, nil
 		},
-	}, nil, nil)
+	}, nil)
 
 	_, err := service.HandleContractResolved(context.Background(), events.ContractResolved{
 		ContractID: 18,

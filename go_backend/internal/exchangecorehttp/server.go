@@ -13,25 +13,22 @@ import (
 	"iwx/go_backend/internal/exchangecore"
 	"iwx/go_backend/internal/matching"
 	"iwx/go_backend/internal/requestctx"
-	"iwx/go_backend/internal/store"
 	"iwx/go_backend/pkg/logging"
 )
 
 type Server struct {
-	config        config.Config
-	service       *exchangecore.Service
-	matcher       matching.CommandClient
-	orderCommands store.OrderCommandRepository
-	mux           *http.ServeMux
+	config  config.Config
+	service *exchangecore.Service
+	matcher matching.CommandClient
+	mux     *http.ServeMux
 }
 
-func NewServer(cfg config.Config, service *exchangecore.Service, matcher matching.CommandClient, orderCommands store.OrderCommandRepository) *Server {
+func NewServer(cfg config.Config, service *exchangecore.Service, matcher matching.CommandClient) *Server {
 	server := &Server{
-		config:        cfg,
-		service:       service,
-		matcher:       matcher,
-		orderCommands: orderCommands,
-		mux:           http.NewServeMux(),
+		config:  cfg,
+		service: service,
+		matcher: matcher,
+		mux:     http.NewServeMux(),
 	}
 
 	server.registerRoutes()
@@ -50,6 +47,8 @@ func (s *Server) ListenAndServe() error {
 
 func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/", s.handleIndex)
+	s.mux.HandleFunc("/internal/contracts/", s.handleInternalContracts)
+	s.mux.HandleFunc("/internal/projection/", s.handleInternalProjection)
 	s.mux.HandleFunc("/api/accounts/me", s.handleAccountMe)
 	s.mux.HandleFunc("/api/accounts/me/ledger", s.handleAccountLedger)
 	s.mux.HandleFunc("/api/accounts/me/collateral_locks", s.handleAccountCollateralLocks)
@@ -63,50 +62,9 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/api/positions/me", s.handlePositionsMe)
 	s.mux.HandleFunc("/api/positions/me/locks", s.handlePositionLocksMe)
 	s.mux.HandleFunc("/api/orders", s.handleOrders)
-	s.mux.HandleFunc("/api/order_commands/", s.handleOrderCommands)
 	s.mux.HandleFunc("/api/contracts", s.handleContracts)
 	s.mux.HandleFunc("/api/contracts/", s.handleContractLifecycle)
 	s.mux.HandleFunc("/api/contract_commands/", s.handleContractCommands)
-}
-
-func (s *Server) handleOrderCommands(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		methodNotAllowed(w, "GET")
-		return
-	}
-	requireAuth(s.config, s.handleOrderCommandShow)(w, r)
-}
-
-func (s *Server) handleOrderCommandShow(w http.ResponseWriter, r *http.Request) {
-	claims, err := authcontext.ClaimsFromContext(r.Context())
-	if err != nil {
-		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "missing auth context"})
-		return
-	}
-
-	commandID := strings.TrimPrefix(r.URL.Path, "/api/order_commands/")
-	commandID = strings.Trim(commandID, "/")
-	if commandID == "" {
-		http.NotFound(w, r)
-		return
-	}
-
-	command, err := s.orderCommands.GetOrderCommand(r.Context(), commandID)
-	if err != nil {
-		logging.Error(r.Context(), "exchange_core_order_command_lookup_failed", err, "command_id", commandID)
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
-		return
-	}
-	if command == nil {
-		writeJSON(w, http.StatusNotFound, map[string]any{"error": "order command not found"})
-		return
-	}
-	if command.UserID != claims.UserID {
-		writeJSON(w, http.StatusForbidden, map[string]any{"error": "forbidden"})
-		return
-	}
-
-	writeJSON(w, http.StatusOK, serializePlaceOrderCommand(*command))
 }
 
 func (s *Server) handleIndex(w http.ResponseWriter, _ *http.Request) {
@@ -154,11 +112,11 @@ func (s *Server) handleContractsCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	logging.Info(r.Context(), "exchange_core_contract_submitted", "command_id", result.CommandID, "creator_user_id", command.CreatorUserID, "status", result.Status, "name", command.Name)
-	writeJSON(w, http.StatusAccepted, map[string]any{
-		"command_id":  result.CommandID,
-		"partition":   result.Partition,
-		"status":      result.Status,
-		"enqueued_at": result.EnqueuedAt.UTC().Format(time.RFC3339),
+	writeJSON(w, http.StatusAccepted, createContractAcceptedResponse{
+		CommandID:  result.CommandID,
+		Partition:  result.Partition,
+		Status:     result.Status,
+		EnqueuedAt: result.EnqueuedAt.UTC().Format(time.RFC3339),
 	})
 }
 

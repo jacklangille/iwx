@@ -2,14 +2,18 @@ package oracle
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/nats-io/nuid"
+
 	"iwx/go_backend/internal/domain"
 	"iwx/go_backend/internal/events"
-	"iwx/go_backend/internal/readprojection"
+	"iwx/go_backend/internal/outbox"
+	"iwx/go_backend/internal/projectionchange"
 	"iwx/go_backend/internal/requestctx"
 	"iwx/go_backend/internal/store"
 )
@@ -36,20 +40,20 @@ func (e *ValidationError) Error() string {
 type Service struct {
 	oracleRepo     store.OracleRepository
 	contracts      contractRepository
-	projector      *readprojection.Projector
+	emitter        *projectionchange.Emitter
 	eventPublisher EventPublisher
 }
 
 func NewService(
 	oracleRepo store.OracleRepository,
 	contracts contractRepository,
-	projector *readprojection.Projector,
+	emitter *projectionchange.Emitter,
 	eventPublisher EventPublisher,
 ) *Service {
 	return &Service{
 		oracleRepo:     oracleRepo,
 		contracts:      contracts,
-		projector:      projector,
+		emitter:        emitter,
 		eventPublisher: eventPublisher,
 	}
 }
@@ -73,6 +77,10 @@ func (s *Service) UpsertStation(ctx context.Context, input store.UpsertStationIn
 
 func (s *Service) ListStations(ctx context.Context, activeOnly bool) ([]domain.WeatherStation, error) {
 	return s.oracleRepo.ListStations(ctx, activeOnly)
+}
+
+func (s *Service) FindStation(ctx context.Context, providerName, stationID string) (*domain.WeatherStation, error) {
+	return s.oracleRepo.FindStation(ctx, providerName, stationID)
 }
 
 func (s *Service) RecordObservation(ctx context.Context, input store.RecordObservationInput) (*domain.OracleObservation, error) {
@@ -113,53 +121,54 @@ func (s *Service) ResolveContract(ctx context.Context, contractID int64) (*domai
 		return nil, fmt.Errorf("contract not found")
 	}
 
-	if existing, err := s.oracleRepo.GetLatestResolution(ctx, contractID); err != nil {
-		return nil, err
-	} else if existing != nil {
-		return existing, nil
-	}
-
-	rule, err := s.contracts.GetContractRule(ctx, contractID)
+	resolution, err := s.oracleRepo.GetLatestResolution(ctx, contractID)
 	if err != nil {
 		return nil, err
 	}
-	if rule == nil {
-		return nil, fmt.Errorf("contract rule not found")
-	}
-	if rule.Threshold == nil {
-		return nil, fmt.Errorf("contract threshold missing")
-	}
+	if resolution == nil {
+		rule, err := s.contracts.GetContractRule(ctx, contractID)
+		if err != nil {
+			return nil, err
+		}
+		if rule == nil {
+			return nil, fmt.Errorf("contract rule not found")
+		}
+		if rule.Threshold == nil {
+			return nil, fmt.Errorf("contract threshold missing")
+		}
 
-	observations, err := s.oracleRepo.ListObservations(ctx, contractID, 500)
-	if err != nil {
-		return nil, err
-	}
-	selected := latestObservationWithinWindow(observations, contract)
-	if selected == nil {
-		return nil, fmt.Errorf("no observations available for contract measurement window")
-	}
+		observations, err := s.oracleRepo.ListObservations(ctx, contractID, 500)
+		if err != nil {
+			return nil, err
+		}
+		selected := latestObservationWithinWindow(observations, contract)
+		if selected == nil {
+			return nil, fmt.Errorf("no observations available for contract measurement window")
+		}
 
-	value, err := strconv.ParseFloat(strings.TrimSpace(selected.NormalizedValue), 64)
-	if err != nil {
-		return nil, fmt.Errorf("invalid normalized_value: %w", err)
-	}
+		value, err := strconv.ParseFloat(strings.TrimSpace(selected.NormalizedValue), 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid normalized_value: %w", err)
+		}
 
-	threshold := float64(*rule.Threshold)
-	outcome := resolveOutcome(value, threshold, rule.ResolutionInclusiveSide)
+		threshold := float64(*rule.Threshold)
+		outcome := resolveOutcome(value, threshold, rule.ResolutionInclusiveSide)
 
-	resolution, err := s.oracleRepo.InsertResolution(ctx, domain.ContractResolution{
-		ContractID:             contractID,
-		ProviderName:           selected.ProviderName,
-		StationID:              selected.StationID,
-		ObservedMetric:         selected.ObservedMetric,
-		ObservationWindowStart: selected.ObservationWindowStart,
-		ObservationWindowEnd:   selected.ObservationWindowEnd,
-		RuleVersion:            rule.RuleVersion,
-		ResolvedValue:          selected.NormalizedValue,
-		Outcome:                outcome,
-	})
-	if err != nil {
-		return nil, err
+		resolution, err = s.oracleRepo.InsertResolution(ctx, domain.ContractResolution{
+			EventID:                "contract-resolved:" + nuid.Next(),
+			ContractID:             contractID,
+			ProviderName:           selected.ProviderName,
+			StationID:              selected.StationID,
+			ObservedMetric:         selected.ObservedMetric,
+			ObservationWindowStart: selected.ObservationWindowStart,
+			ObservationWindowEnd:   selected.ObservationWindowEnd,
+			RuleVersion:            rule.RuleVersion,
+			ResolvedValue:          selected.NormalizedValue,
+			Outcome:                outcome,
+		})
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if _, err := s.contracts.UpdateContractStatus(ctx, contractID, string(domain.ContractStateResolved)); err != nil {
@@ -171,12 +180,22 @@ func (s *Service) ResolveContract(ctx context.Context, contractID int64) (*domai
 	if err := s.projectContract(ctx, contractID); err != nil {
 		return nil, err
 	}
-	if s.eventPublisher != nil {
-		if err := s.eventPublisher.PublishContractResolved(ctx, events.ContractResolved{
+	if s.eventPublisher != nil && resolution.PublishedAt == nil {
+		event := events.ContractResolved{
+			EventID:    resolution.EventID,
 			ContractID: contractID,
-			Outcome:    string(outcome),
+			Outcome:    string(resolution.Outcome),
 			TraceID:    requestctx.TraceID(ctx),
 			ResolvedAt: resolution.ResolvedAt,
+		}
+		payload, err := json.Marshal(event)
+		if err != nil {
+			return nil, err
+		}
+		if err := s.oracleRepo.EnqueueOutboxEvent(ctx, outbox.Event{
+			EventID:   event.EventID,
+			EventType: outboxEventTypeContractResolved,
+			Payload:   payload,
 		}); err != nil {
 			return nil, err
 		}
@@ -277,25 +296,55 @@ func resolveOutcome(value, threshold float64, inclusiveSide domain.ClaimSide) do
 }
 
 func (s *Service) projectOracleState(ctx context.Context, contractID int64) error {
-	if s.projector == nil {
+	if s.emitter == nil {
 		return nil
 	}
-
-	return s.projector.ProjectOracleState(ctx, contractID)
+	resolution, err := s.oracleRepo.GetLatestResolution(ctx, contractID)
+	if err != nil {
+		return err
+	}
+	versionTime := time.Time{}
+	if resolution != nil {
+		versionTime = resolution.ResolvedAt
+	} else {
+		observations, err := s.oracleRepo.ListObservations(ctx, contractID, 1)
+		if err != nil {
+			return err
+		}
+		if len(observations) > 0 {
+			versionTime = observations[0].RecordedAt
+		}
+	}
+	return s.emitter.EmitOracleStateChanged(ctx, contractID, versionTime)
 }
 
 func (s *Service) projectContract(ctx context.Context, contractID int64) error {
-	if s.projector == nil {
+	if s.emitter == nil {
 		return nil
 	}
-
-	return s.projector.ProjectContract(ctx, contractID)
+	contract, err := s.contracts.GetContract(ctx, contractID)
+	if err != nil || contract == nil {
+		return err
+	}
+	return s.emitter.EmitContractChanged(ctx, contractID, contract.UpdatedAt)
 }
 
 func (s *Service) projectStationCatalog(ctx context.Context) error {
-	if s.projector == nil {
+	if s.emitter == nil {
 		return nil
 	}
-
-	return s.projector.ProjectStationCatalog(ctx)
+	stations, err := s.oracleRepo.ListStations(ctx, false)
+	if err != nil {
+		return err
+	}
+	versionTime := time.Time{}
+	for _, station := range stations {
+		if station.UpdatedAt.After(versionTime) {
+			versionTime = station.UpdatedAt
+		}
+	}
+	if versionTime.IsZero() {
+		versionTime = time.Now().UTC()
+	}
+	return s.emitter.EmitStationCatalogChanged(ctx, versionTime)
 }

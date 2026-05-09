@@ -152,9 +152,9 @@ func (s *Server) handleAccountDepositCreate(w http.ResponseWriter, r *http.Reque
 	}
 
 	log.Printf("exchange-core deposit user_id=%d amount_cents=%d currency=%s account_id=%d", claims.UserID, request.AmountCents, account.Currency, account.ID)
-	writeJSON(w, http.StatusCreated, map[string]any{
-		"account":      serializeCashAccount(account),
-		"ledger_entry": serializeLedgerEntry(entry),
+	writeJSON(w, http.StatusCreated, accountMutationResponse{
+		Account:     serializeCashAccount(account),
+		LedgerEntry: ptrLedgerEntryResponse(serializeLedgerEntry(entry)),
 	})
 }
 
@@ -193,9 +193,9 @@ func (s *Server) handleAccountWithdrawalCreate(w http.ResponseWriter, r *http.Re
 	}
 
 	log.Printf("exchange-core withdrawal user_id=%d amount_cents=%d currency=%s account_id=%d", claims.UserID, request.AmountCents, account.Currency, account.ID)
-	writeJSON(w, http.StatusCreated, map[string]any{
-		"account":      serializeCashAccount(account),
-		"ledger_entry": serializeLedgerEntry(entry),
+	writeJSON(w, http.StatusCreated, accountMutationResponse{
+		Account:     serializeCashAccount(account),
+		LedgerEntry: ptrLedgerEntryResponse(serializeLedgerEntry(entry)),
 	})
 }
 
@@ -235,10 +235,10 @@ func (s *Server) handleCollateralLockCreate(w http.ResponseWriter, r *http.Reque
 	}
 
 	log.Printf("exchange-core collateral_lock_created user_id=%d contract_id=%d amount_cents=%d lock_id=%d", claims.UserID, lock.ContractID, lock.AmountCents, lock.ID)
-	writeJSON(w, http.StatusCreated, map[string]any{
-		"collateral_lock": serializeCollateralLock(lock),
-		"account":         serializeCashAccount(account),
-		"ledger_entry":    serializeLedgerEntry(entry),
+	writeJSON(w, http.StatusCreated, collateralLockMutationResponse{
+		CollateralLock: serializeCollateralLock(lock),
+		Account:        serializeCashAccount(account),
+		LedgerEntry:    ptrLedgerEntryResponse(serializeLedgerEntry(entry)),
 	})
 }
 
@@ -281,10 +281,10 @@ func (s *Server) handleCollateralLockRelease(w http.ResponseWriter, r *http.Requ
 	}
 
 	log.Printf("exchange-core collateral_lock_released user_id=%d lock_id=%d", claims.UserID, lock.ID)
-	writeJSON(w, http.StatusOK, map[string]any{
-		"collateral_lock": serializeCollateralLock(lock),
-		"account":         serializeCashAccount(account),
-		"ledger_entry":    serializeLedgerEntry(entry),
+	writeJSON(w, http.StatusOK, collateralLockMutationResponse{
+		CollateralLock: serializeCollateralLock(lock),
+		Account:        serializeCashAccount(account),
+		LedgerEntry:    ptrLedgerEntryResponse(serializeLedgerEntry(entry)),
 	})
 }
 
@@ -325,10 +325,10 @@ func (s *Server) handleCashReservationCreate(w http.ResponseWriter, r *http.Requ
 	}
 
 	log.Printf("exchange-core cash_reservation_created user_id=%d contract_id=%d reservation_id=%d amount_cents=%d", claims.UserID, reservation.ContractID, reservation.ID, reservation.AmountCents)
-	writeJSON(w, http.StatusCreated, map[string]any{
-		"cash_reservation": serializeOrderCashReservation(reservation),
-		"account":          serializeCashAccount(account),
-		"ledger_entry":     serializeLedgerEntry(entry),
+	writeJSON(w, http.StatusCreated, cashReservationMutationResponse{
+		CashReservation: serializeOrderCashReservation(reservation),
+		Account:         serializeCashAccount(account),
+		LedgerEntry:     ptrLedgerEntryResponse(serializeLedgerEntry(entry)),
 	})
 }
 
@@ -371,10 +371,10 @@ func (s *Server) handleCashReservationRelease(w http.ResponseWriter, r *http.Req
 	}
 
 	log.Printf("exchange-core cash_reservation_released user_id=%d reservation_id=%d", claims.UserID, reservation.ID)
-	writeJSON(w, http.StatusOK, map[string]any{
-		"cash_reservation": serializeOrderCashReservation(reservation),
-		"account":          serializeCashAccount(account),
-		"ledger_entry":     serializeLedgerEntry(entry),
+	writeJSON(w, http.StatusOK, cashReservationMutationResponse{
+		CashReservation: serializeOrderCashReservation(reservation),
+		Account:         serializeCashAccount(account),
+		LedgerEntry:     ptrLedgerEntryResponse(serializeLedgerEntry(entry)),
 	})
 }
 

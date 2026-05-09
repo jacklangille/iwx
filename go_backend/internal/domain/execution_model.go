@@ -5,6 +5,7 @@ import "time"
 type Execution struct {
 	ID                     int64
 	ExecutionID            string
+	CommandID              string
 	ContractID             int64
 	TokenType              string
 	BuyOrderID             int64

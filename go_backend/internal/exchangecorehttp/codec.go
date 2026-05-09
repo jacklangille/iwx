@@ -1,28 +1,14 @@
 package exchangecorehttp
 
 import (
-	"encoding/json"
-	"errors"
 	"io"
 	"time"
 
 	"iwx/go_backend/internal/commands"
 	"iwx/go_backend/internal/domain"
 	"iwx/go_backend/internal/exchangecore"
+	"iwx/go_backend/internal/httpjson"
 )
-
-func decodeCreateContractCommand(body io.Reader) (commands.CreateContract, error) {
-	if body == nil {
-		return commands.CreateContract{}, errors.New("request body is required")
-	}
-
-	var command commands.CreateContract
-	if err := json.NewDecoder(body).Decode(&command); err != nil {
-		return commands.CreateContract{}, err
-	}
-
-	return command, nil
-}
 
 type accountMoneyRequest struct {
 	Currency      string `json:"currency"`
@@ -68,432 +54,653 @@ type issuanceBatchRequest struct {
 	PairedQuantity   int64 `json:"paired_quantity"`
 }
 
-func decodeAccountMoneyRequest(body io.Reader) (accountMoneyRequest, error) {
-	if body == nil {
-		return accountMoneyRequest{}, errors.New("request body is required")
-	}
+type internalSettlementRequest struct {
+	EventID       string `json:"event_id"`
+	Outcome       string `json:"outcome"`
+	ResolvedAt    string `json:"resolved_at"`
+	CorrelationID string `json:"correlation_id"`
+}
 
+type contractCommandResponse struct {
+	CommandID               string  `json:"command_id"`
+	CreatorUserID           int64   `json:"creator_user_id"`
+	Name                    string  `json:"name"`
+	Region                  string  `json:"region"`
+	Metric                  string  `json:"metric"`
+	Status                  string  `json:"status"`
+	Threshold               *int64  `json:"threshold"`
+	Multiplier              *int64  `json:"multiplier"`
+	MeasurementUnit         *string `json:"measurement_unit"`
+	TradingPeriodStart      *string `json:"trading_period_start"`
+	TradingPeriodEnd        *string `json:"trading_period_end"`
+	MeasurementPeriodStart  *string `json:"measurement_period_start"`
+	MeasurementPeriodEnd    *string `json:"measurement_period_end"`
+	DataProviderName        *string `json:"data_provider_name"`
+	StationID               *string `json:"station_id"`
+	DataProviderStationMode *string `json:"data_provider_station_mode"`
+	Description             *string `json:"description"`
+	CommandStatus           string  `json:"command_status"`
+	ErrorMessage            *string `json:"error_message"`
+	ResultContractID        *int64  `json:"result_contract_id"`
+	EnqueuedAt              string  `json:"enqueued_at"`
+	StartedAt               *string `json:"started_at"`
+	CompletedAt             *string `json:"completed_at"`
+	UpdatedAt               string  `json:"updated_at"`
+}
+
+type placeOrderAcceptedResponse struct {
+	CommandID  string `json:"command_id"`
+	ContractID int64  `json:"contract_id"`
+	Partition  int    `json:"partition"`
+	Status     string `json:"status"`
+	EnqueuedAt string `json:"enqueued_at"`
+}
+
+type createContractAcceptedResponse struct {
+	CommandID  string `json:"command_id"`
+	Partition  int    `json:"partition"`
+	Status     string `json:"status"`
+	EnqueuedAt string `json:"enqueued_at"`
+}
+
+type orderCommandResponse struct {
+	CommandID     string  `json:"command_id"`
+	ContractID    int64   `json:"contract_id"`
+	UserID        int64   `json:"user_id"`
+	TokenType     string  `json:"token_type"`
+	OrderSide     string  `json:"order_side"`
+	Price         string  `json:"price"`
+	Quantity      int64   `json:"quantity"`
+	Status        string  `json:"status"`
+	ErrorMessage  *string `json:"error_message"`
+	ResultStatus  *string `json:"result_status"`
+	ResultOrderID *int64  `json:"result_order_id"`
+	EnqueuedAt    string  `json:"enqueued_at"`
+	StartedAt     *string `json:"started_at"`
+	CompletedAt   *string `json:"completed_at"`
+	UpdatedAt     string  `json:"updated_at"`
+}
+
+type contractDetailsResponse struct {
+	Contract *contractResponse     `json:"contract"`
+	Rule     *contractRuleResponse `json:"rule"`
+}
+
+type contractResponse struct {
+	ID                      int64   `json:"id"`
+	CreatorUserID           *int64  `json:"creator_user_id"`
+	Name                    string  `json:"name"`
+	Region                  string  `json:"region"`
+	Metric                  string  `json:"metric"`
+	Status                  string  `json:"status"`
+	Threshold               *int64  `json:"threshold"`
+	Multiplier              *int64  `json:"multiplier"`
+	MeasurementUnit         *string `json:"measurement_unit"`
+	TradingPeriodStart      *string `json:"trading_period_start"`
+	TradingPeriodEnd        *string `json:"trading_period_end"`
+	MeasurementPeriodStart  *string `json:"measurement_period_start"`
+	MeasurementPeriodEnd    *string `json:"measurement_period_end"`
+	DataProviderName        *string `json:"data_provider_name"`
+	StationID               *string `json:"station_id"`
+	DataProviderStationMode *string `json:"data_provider_station_mode"`
+	Description             *string `json:"description"`
+}
+
+type contractRuleResponse struct {
+	ID                      int64   `json:"id"`
+	ContractID              int64   `json:"contract_id"`
+	RuleVersion             string  `json:"rule_version"`
+	Metric                  string  `json:"metric"`
+	Threshold               *int64  `json:"threshold"`
+	MeasurementUnit         *string `json:"measurement_unit"`
+	ResolutionInclusiveSide string  `json:"resolution_inclusive_side"`
+	CreatedAt               string  `json:"created_at"`
+}
+
+type collateralRequirementResponse struct {
+	ContractID          int64  `json:"contract_id"`
+	PairedQuantity      int64  `json:"paired_quantity"`
+	PerPairCents        int64  `json:"per_pair_cents"`
+	RequiredAmountCents int64  `json:"required_amount_cents"`
+	Currency            string `json:"currency"`
+}
+
+type cashAccountResponse struct {
+	ID             int64  `json:"id"`
+	UserID         int64  `json:"user_id"`
+	Currency       string `json:"currency"`
+	AvailableCents int64  `json:"available_cents"`
+	LockedCents    int64  `json:"locked_cents"`
+	TotalCents     int64  `json:"total_cents"`
+	UpdatedAt      string `json:"updated_at"`
+}
+
+type ledgerEntryResponse struct {
+	ID            int64  `json:"id"`
+	AccountID     int64  `json:"account_id"`
+	UserID        int64  `json:"user_id"`
+	EntryType     string `json:"entry_type"`
+	AmountCents   int64  `json:"amount_cents"`
+	ReferenceType string `json:"reference_type"`
+	ReferenceID   string `json:"reference_id"`
+	CorrelationID string `json:"correlation_id"`
+	Description   string `json:"description"`
+	OccurredAt    string `json:"occurred_at"`
+}
+
+type collateralLockResponse struct {
+	ID                  int64   `json:"id"`
+	UserID              int64   `json:"user_id"`
+	ContractID          int64   `json:"contract_id"`
+	Currency            string  `json:"currency"`
+	AmountCents         int64   `json:"amount_cents"`
+	Status              string  `json:"status"`
+	ReferenceID         *string `json:"reference_id"`
+	Description         *string `json:"description"`
+	ReferenceIssuanceID *int64  `json:"reference_issuance_id"`
+	CreatedAt           string  `json:"created_at"`
+	UpdatedAt           string  `json:"updated_at"`
+	ReleasedAt          *string `json:"released_at"`
+}
+
+type orderCashReservationResponse struct {
+	ID            int64   `json:"id"`
+	UserID        int64   `json:"user_id"`
+	ContractID    int64   `json:"contract_id"`
+	Currency      string  `json:"currency"`
+	AmountCents   int64   `json:"amount_cents"`
+	Status        string  `json:"status"`
+	ReferenceType string  `json:"reference_type"`
+	ReferenceID   string  `json:"reference_id"`
+	CorrelationID *string `json:"correlation_id"`
+	Description   *string `json:"description"`
+	CreatedAt     string  `json:"created_at"`
+	UpdatedAt     string  `json:"updated_at"`
+	ReleasedAt    *string `json:"released_at"`
+}
+
+type issuanceBatchResponse struct {
+	ID               int64  `json:"id"`
+	ContractID       int64  `json:"contract_id"`
+	CreatorUserID    int64  `json:"creator_user_id"`
+	CollateralLockID int64  `json:"collateral_lock_id"`
+	AboveQuantity    int64  `json:"above_quantity"`
+	BelowQuantity    int64  `json:"below_quantity"`
+	Status           string `json:"status"`
+	CreatedAt        string `json:"created_at"`
+	UpdatedAt        string `json:"updated_at"`
+}
+
+type positionResponse struct {
+	ID                int64  `json:"id"`
+	UserID            int64  `json:"user_id"`
+	ContractID        int64  `json:"contract_id"`
+	Side              string `json:"side"`
+	AvailableQuantity int64  `json:"available_quantity"`
+	LockedQuantity    int64  `json:"locked_quantity"`
+	TotalQuantity     int64  `json:"total_quantity"`
+	UpdatedAt         string `json:"updated_at"`
+}
+
+type positionLockResponse struct {
+	ID            int64   `json:"id"`
+	UserID        int64   `json:"user_id"`
+	ContractID    int64   `json:"contract_id"`
+	Side          string  `json:"side"`
+	Quantity      int64   `json:"quantity"`
+	Status        string  `json:"status"`
+	OrderID       *int64  `json:"order_id"`
+	ReferenceType *string `json:"reference_type"`
+	ReferenceID   *string `json:"reference_id"`
+	CorrelationID *string `json:"correlation_id"`
+	Description   *string `json:"description"`
+	CreatedAt     string  `json:"created_at"`
+	UpdatedAt     string  `json:"updated_at"`
+	ReleasedAt    *string `json:"released_at"`
+}
+
+type accountMutationResponse struct {
+	Account     *cashAccountResponse `json:"account"`
+	LedgerEntry *ledgerEntryResponse `json:"ledger_entry"`
+}
+
+type collateralLockMutationResponse struct {
+	CollateralLock *collateralLockResponse `json:"collateral_lock"`
+	Account        *cashAccountResponse    `json:"account"`
+	LedgerEntry    *ledgerEntryResponse    `json:"ledger_entry"`
+}
+
+type cashReservationMutationResponse struct {
+	CashReservation *orderCashReservationResponse `json:"cash_reservation"`
+	Account         *cashAccountResponse          `json:"account"`
+	LedgerEntry     *ledgerEntryResponse          `json:"ledger_entry"`
+}
+
+type contractCollateralLockMutationResponse struct {
+	Requirement    *collateralRequirementResponse `json:"requirement"`
+	CollateralLock *collateralLockResponse        `json:"collateral_lock"`
+	Account        *cashAccountResponse           `json:"account"`
+	LedgerEntry    *ledgerEntryResponse           `json:"ledger_entry"`
+}
+
+type issuanceBatchMutationResponse struct {
+	IssuanceBatch  *issuanceBatchResponse    `json:"issuance_batch"`
+	CollateralLock *collateralLockResponse   `json:"collateral_lock"`
+	Positions      []positionResponse        `json:"positions"`
+}
+
+type internalContractResponse struct {
+	Contract *contractResponse     `json:"contract"`
+	Rule     *contractRuleResponse `json:"rule"`
+}
+
+type internalSettlementResponse struct {
+	Contract      *contractResponse `json:"contract"`
+	AffectedUsers []int64           `json:"affected_users"`
+	SettledAt     string            `json:"settled_at"`
+}
+
+func decodeCreateContractCommand(body io.Reader) (commands.CreateContract, error) {
+	var command commands.CreateContract
+	if err := httpjson.DecodeStrict(body, &command); err != nil {
+		return commands.CreateContract{}, err
+	}
+	return command, nil
+}
+
+func decodeAccountMoneyRequest(body io.Reader) (accountMoneyRequest, error) {
 	var request accountMoneyRequest
-	if err := json.NewDecoder(body).Decode(&request); err != nil {
+	if err := httpjson.DecodeStrict(body, &request); err != nil {
 		return accountMoneyRequest{}, err
 	}
-
 	return request, nil
 }
 
 func decodeCollateralLockRequest(body io.Reader) (collateralLockRequest, error) {
-	if body == nil {
-		return collateralLockRequest{}, errors.New("request body is required")
-	}
-
 	var request collateralLockRequest
-	if err := json.NewDecoder(body).Decode(&request); err != nil {
+	if err := httpjson.DecodeStrict(body, &request); err != nil {
 		return collateralLockRequest{}, err
 	}
-
 	return request, nil
 }
 
 func decodeCashReservationRequest(body io.Reader) (cashReservationRequest, error) {
-	if body == nil {
-		return cashReservationRequest{}, errors.New("request body is required")
-	}
-
 	var request cashReservationRequest
-	if err := json.NewDecoder(body).Decode(&request); err != nil {
+	if err := httpjson.DecodeStrict(body, &request); err != nil {
 		return cashReservationRequest{}, err
 	}
-
 	return request, nil
 }
 
 func decodeReleaseRequest(body io.Reader) (releaseRequest, error) {
-	if body == nil {
-		return releaseRequest{}, nil
-	}
-
 	var request releaseRequest
-	if err := json.NewDecoder(body).Decode(&request); err != nil && !errors.Is(err, io.EOF) {
+	if err := httpjson.DecodeStrictAllowEOF(body, &request); err != nil {
 		return releaseRequest{}, err
 	}
-
 	return request, nil
 }
 
 func decodeContractCollateralLockRequest(body io.Reader) (contractCollateralLockRequest, error) {
-	if body == nil {
-		return contractCollateralLockRequest{}, errors.New("request body is required")
-	}
-
 	var request contractCollateralLockRequest
-	if err := json.NewDecoder(body).Decode(&request); err != nil {
+	if err := httpjson.DecodeStrict(body, &request); err != nil {
 		return contractCollateralLockRequest{}, err
 	}
-
 	return request, nil
 }
 
 func decodeIssuanceBatchRequest(body io.Reader) (issuanceBatchRequest, error) {
-	if body == nil {
-		return issuanceBatchRequest{}, errors.New("request body is required")
-	}
-
 	var request issuanceBatchRequest
-	if err := json.NewDecoder(body).Decode(&request); err != nil {
+	if err := httpjson.DecodeStrict(body, &request); err != nil {
 		return issuanceBatchRequest{}, err
 	}
-
 	return request, nil
 }
 
-func serializeContractCommand(command *commands.ContractCommand) map[string]any {
-	return map[string]any{
-		"command_id":                 command.CommandID,
-		"creator_user_id":            command.CreatorUserID,
-		"name":                       command.Name,
-		"region":                     command.Region,
-		"metric":                     command.Metric,
-		"status":                     command.Status,
-		"threshold":                  command.Threshold,
-		"multiplier":                 command.Multiplier,
-		"measurement_unit":           command.MeasurementUnit,
-		"trading_period_start":       dateString(command.TradingPeriodStart),
-		"trading_period_end":         dateString(command.TradingPeriodEnd),
-		"measurement_period_start":   dateString(command.MeasurementPeriodStart),
-		"measurement_period_end":     dateString(command.MeasurementPeriodEnd),
-		"data_provider_name":         command.DataProviderName,
-		"station_id":                 command.StationID,
-		"data_provider_station_mode": command.DataProviderStationMode,
-		"description":                command.Description,
-		"command_status":             command.CommandStatus,
-		"error_message":              command.ErrorMessage,
-		"result_contract_id":         command.ResultContractID,
-		"enqueued_at":                command.EnqueuedAt.UTC().Format(time.RFC3339),
-		"started_at":                 timestampRFC3339(command.StartedAt),
-		"completed_at":               timestampRFC3339(command.CompletedAt),
-		"updated_at":                 command.UpdatedAt.UTC().Format(time.RFC3339),
+func decodeInternalSettlementRequest(body io.Reader) (internalSettlementRequest, error) {
+	var request internalSettlementRequest
+	if err := httpjson.DecodeStrict(body, &request); err != nil {
+		return internalSettlementRequest{}, err
+	}
+	return request, nil
+}
+
+func serializeContractCommand(command *commands.ContractCommand) *contractCommandResponse {
+	if command == nil {
+		return nil
+	}
+	return &contractCommandResponse{
+		CommandID:               command.CommandID,
+		CreatorUserID:           command.CreatorUserID,
+		Name:                    command.Name,
+		Region:                  command.Region,
+		Metric:                  command.Metric,
+		Status:                  command.Status,
+		Threshold:               command.Threshold,
+		Multiplier:              command.Multiplier,
+		MeasurementUnit:         command.MeasurementUnit,
+		TradingPeriodStart:      dateString(command.TradingPeriodStart),
+		TradingPeriodEnd:        dateString(command.TradingPeriodEnd),
+		MeasurementPeriodStart:  dateString(command.MeasurementPeriodStart),
+		MeasurementPeriodEnd:    dateString(command.MeasurementPeriodEnd),
+		DataProviderName:        command.DataProviderName,
+		StationID:               command.StationID,
+		DataProviderStationMode: command.DataProviderStationMode,
+		Description:             command.Description,
+		CommandStatus:           command.CommandStatus,
+		ErrorMessage:            command.ErrorMessage,
+		ResultContractID:        command.ResultContractID,
+		EnqueuedAt:              command.EnqueuedAt.UTC().Format(time.RFC3339),
+		StartedAt:               timestampRFC3339(command.StartedAt),
+		CompletedAt:             timestampRFC3339(command.CompletedAt),
+		UpdatedAt:               command.UpdatedAt.UTC().Format(time.RFC3339),
 	}
 }
 
-func serializePlaceOrderAccepted(result commands.PlaceOrderAccepted) map[string]any {
-	return map[string]any{
-		"command_id":  result.CommandID,
-		"contract_id": result.ContractID,
-		"partition":   result.Partition,
-		"status":      result.Status,
-		"enqueued_at": result.EnqueuedAt.UTC().Format(time.RFC3339),
+func serializePlaceOrderAccepted(result commands.PlaceOrderAccepted) placeOrderAcceptedResponse {
+	return placeOrderAcceptedResponse{
+		CommandID:  result.CommandID,
+		ContractID: result.ContractID,
+		Partition:  result.Partition,
+		Status:     result.Status,
+		EnqueuedAt: result.EnqueuedAt.UTC().Format(time.RFC3339),
 	}
 }
 
-func serializePlaceOrderCommand(command commands.OrderCommand) map[string]any {
-	return map[string]any{
-		"command_id":      command.CommandID,
-		"contract_id":     command.ContractID,
-		"user_id":         command.UserID,
-		"token_type":      command.TokenType,
-		"order_side":      command.OrderSide,
-		"price":           command.Price,
-		"quantity":        command.Quantity,
-		"status":          command.Status,
-		"error_message":   command.ErrorMessage,
-		"result_status":   command.ResultStatus,
-		"result_order_id": command.ResultOrderID,
-		"enqueued_at":     command.EnqueuedAt.UTC().Format(time.RFC3339),
-		"started_at":      timestampRFC3339(command.StartedAt),
-		"completed_at":    timestampRFC3339(command.CompletedAt),
-		"updated_at":      command.UpdatedAt.UTC().Format(time.RFC3339),
+func serializePlaceOrderCommand(command commands.OrderCommand) orderCommandResponse {
+	return orderCommandResponse{
+		CommandID:     command.CommandID,
+		ContractID:    command.ContractID,
+		UserID:        command.UserID,
+		TokenType:     command.TokenType,
+		OrderSide:     command.OrderSide,
+		Price:         command.Price,
+		Quantity:      command.Quantity,
+		Status:        command.Status,
+		ErrorMessage:  command.ErrorMessage,
+		ResultStatus:  command.ResultStatus,
+		ResultOrderID: command.ResultOrderID,
+		EnqueuedAt:    command.EnqueuedAt.UTC().Format(time.RFC3339),
+		StartedAt:     timestampRFC3339(command.StartedAt),
+		CompletedAt:   timestampRFC3339(command.CompletedAt),
+		UpdatedAt:     command.UpdatedAt.UTC().Format(time.RFC3339),
 	}
 }
 
-func serializeContractDetails(details *exchangecore.ContractDetails) map[string]any {
+func serializeContractDetails(details *exchangecore.ContractDetails) *contractDetailsResponse {
 	if details == nil {
 		return nil
 	}
-
-	return map[string]any{
-		"contract": serializeContractLifecycleContract(details.Contract),
-		"rule":     serializeContractRule(details.Rule),
+	return &contractDetailsResponse{
+		Contract: serializeContractLifecycleContract(details.Contract),
+		Rule:     serializeContractRule(details.Rule),
 	}
 }
 
-func serializeContractLifecycleContract(contract *domain.Contract) map[string]any {
+func serializeContractLifecycleContract(contract *domain.Contract) *contractResponse {
 	if contract == nil {
 		return nil
 	}
-
-	return map[string]any{
-		"id":                         contract.ID,
-		"creator_user_id":            contract.CreatorUserID,
-		"name":                       contract.Name,
-		"region":                     contract.Region,
-		"metric":                     contract.Metric,
-		"status":                     contract.Status,
-		"threshold":                  contract.Threshold,
-		"multiplier":                 contract.Multiplier,
-		"measurement_unit":           blankToNil(contract.MeasurementUnit),
-		"trading_period_start":       dateString(contract.TradingPeriodStart),
-		"trading_period_end":         dateString(contract.TradingPeriodEnd),
-		"measurement_period_start":   dateString(contract.MeasurementPeriodStart),
-		"measurement_period_end":     dateString(contract.MeasurementPeriodEnd),
-		"data_provider_name":         blankToNil(contract.DataProviderName),
-		"station_id":                 blankToNil(contract.StationID),
-		"data_provider_station_mode": blankToNil(contract.DataProviderStationMode),
-		"description":                blankToNil(contract.Description),
+	return &contractResponse{
+		ID:                      contract.ID,
+		CreatorUserID:           contract.CreatorUserID,
+		Name:                    contract.Name,
+		Region:                  contract.Region,
+		Metric:                  contract.Metric,
+		Status:                  contract.Status,
+		Threshold:               contract.Threshold,
+		Multiplier:              contract.Multiplier,
+		MeasurementUnit:         stringOrNil(contract.MeasurementUnit),
+		TradingPeriodStart:      dateString(contract.TradingPeriodStart),
+		TradingPeriodEnd:        dateString(contract.TradingPeriodEnd),
+		MeasurementPeriodStart:  dateString(contract.MeasurementPeriodStart),
+		MeasurementPeriodEnd:    dateString(contract.MeasurementPeriodEnd),
+		DataProviderName:        stringOrNil(contract.DataProviderName),
+		StationID:               stringOrNil(contract.StationID),
+		DataProviderStationMode: stringOrNil(contract.DataProviderStationMode),
+		Description:             stringOrNil(contract.Description),
 	}
 }
 
-func serializeContractRule(rule *domain.ContractRule) map[string]any {
+func serializeContractRule(rule *domain.ContractRule) *contractRuleResponse {
 	if rule == nil {
 		return nil
 	}
-
-	return map[string]any{
-		"id":                        rule.ID,
-		"contract_id":               rule.ContractID,
-		"rule_version":              rule.RuleVersion,
-		"metric":                    rule.Metric,
-		"threshold":                 rule.Threshold,
-		"measurement_unit":          blankToNil(rule.MeasurementUnit),
-		"resolution_inclusive_side": rule.ResolutionInclusiveSide,
-		"created_at":                rule.CreatedAt.UTC().Format(time.RFC3339),
+	return &contractRuleResponse{
+		ID:                      rule.ID,
+		ContractID:              rule.ContractID,
+		RuleVersion:             rule.RuleVersion,
+		Metric:                  rule.Metric,
+		Threshold:               rule.Threshold,
+		MeasurementUnit:         stringOrNil(rule.MeasurementUnit),
+		ResolutionInclusiveSide: string(rule.ResolutionInclusiveSide),
+		CreatedAt:               rule.CreatedAt.UTC().Format(time.RFC3339),
 	}
 }
 
-func serializeCollateralRequirement(requirement *exchangecore.CollateralRequirement) map[string]any {
+func serializeCollateralRequirement(requirement *exchangecore.CollateralRequirement) *collateralRequirementResponse {
 	if requirement == nil {
 		return nil
 	}
-
-	return map[string]any{
-		"contract_id":           requirement.ContractID,
-		"paired_quantity":       requirement.PairedQuantity,
-		"per_pair_cents":        requirement.PerPairCents,
-		"required_amount_cents": requirement.RequiredAmountCents,
-		"currency":              requirement.Currency,
+	return &collateralRequirementResponse{
+		ContractID:          requirement.ContractID,
+		PairedQuantity:      requirement.PairedQuantity,
+		PerPairCents:        requirement.PerPairCents,
+		RequiredAmountCents: requirement.RequiredAmountCents,
+		Currency:            requirement.Currency,
 	}
 }
 
-func serializeCashAccount(account *domain.CashAccount) map[string]any {
+func serializeCashAccount(account *domain.CashAccount) *cashAccountResponse {
 	if account == nil {
 		return nil
 	}
-
-	return map[string]any{
-		"id":              account.ID,
-		"user_id":         account.UserID,
-		"currency":        account.Currency,
-		"available_cents": account.AvailableCents,
-		"locked_cents":    account.LockedCents,
-		"total_cents":     account.TotalCents,
-		"updated_at":      account.UpdatedAt.UTC().Format(time.RFC3339),
+	return &cashAccountResponse{
+		ID:             account.ID,
+		UserID:         account.UserID,
+		Currency:       account.Currency,
+		AvailableCents: account.AvailableCents,
+		LockedCents:    account.LockedCents,
+		TotalCents:     account.TotalCents,
+		UpdatedAt:      account.UpdatedAt.UTC().Format(time.RFC3339),
 	}
 }
 
-func serializeLedgerEntries(entries []domain.LedgerEntry) []map[string]any {
-	rows := make([]map[string]any, 0, len(entries))
+func serializeLedgerEntries(entries []domain.LedgerEntry) []ledgerEntryResponse {
+	rows := make([]ledgerEntryResponse, 0, len(entries))
 	for _, entry := range entries {
 		rows = append(rows, serializeLedgerEntry(&entry))
 	}
-
 	return rows
 }
 
-func serializeLedgerEntry(entry *domain.LedgerEntry) map[string]any {
+func serializeLedgerEntry(entry *domain.LedgerEntry) ledgerEntryResponse {
 	if entry == nil {
-		return nil
+		return ledgerEntryResponse{}
 	}
-
-	return map[string]any{
-		"id":             entry.ID,
-		"account_id":     entry.AccountID,
-		"user_id":        entry.UserID,
-		"entry_type":     entry.EntryType,
-		"amount_cents":   entry.AmountCents,
-		"reference_type": entry.ReferenceType,
-		"reference_id":   entry.ReferenceID,
-		"correlation_id": entry.CorrelationID,
-		"description":    entry.Description,
-		"occurred_at":    entry.OccurredAt.UTC().Format(time.RFC3339),
+	return ledgerEntryResponse{
+		ID:            entry.ID,
+		AccountID:     entry.AccountID,
+		UserID:        entry.UserID,
+		EntryType:     string(entry.EntryType),
+		AmountCents:   entry.AmountCents,
+		ReferenceType: entry.ReferenceType,
+		ReferenceID:   entry.ReferenceID,
+		CorrelationID: entry.CorrelationID,
+		Description:   entry.Description,
+		OccurredAt:    entry.OccurredAt.UTC().Format(time.RFC3339),
 	}
 }
 
-func serializeCollateralLocks(locks []domain.CollateralLock) []map[string]any {
-	rows := make([]map[string]any, 0, len(locks))
+func serializeCollateralLocks(locks []domain.CollateralLock) []collateralLockResponse {
+	rows := make([]collateralLockResponse, 0, len(locks))
 	for _, lock := range locks {
-		rows = append(rows, serializeCollateralLock(&lock))
+		rows = append(rows, *serializeCollateralLock(&lock))
 	}
-
 	return rows
 }
 
-func serializeCollateralLock(lock *domain.CollateralLock) map[string]any {
+func serializeCollateralLock(lock *domain.CollateralLock) *collateralLockResponse {
 	if lock == nil {
 		return nil
 	}
-
-	return map[string]any{
-		"id":                    lock.ID,
-		"user_id":               lock.UserID,
-		"contract_id":           lock.ContractID,
-		"currency":              lock.Currency,
-		"amount_cents":          lock.AmountCents,
-		"status":                lock.Status,
-		"reference_id":          blankToNil(lock.ReferenceID),
-		"description":           blankToNil(lock.Description),
-		"reference_issuance_id": lock.ReferenceIssuanceID,
-		"created_at":            lock.CreatedAt.UTC().Format(time.RFC3339),
-		"updated_at":            lock.UpdatedAt.UTC().Format(time.RFC3339),
-		"released_at":           timestampRFC3339(lock.ReleasedAt),
+	return &collateralLockResponse{
+		ID:                  lock.ID,
+		UserID:              lock.UserID,
+		ContractID:          lock.ContractID,
+		Currency:            lock.Currency,
+		AmountCents:         lock.AmountCents,
+		Status:              string(lock.Status),
+		ReferenceID:         stringOrNil(lock.ReferenceID),
+		Description:         stringOrNil(lock.Description),
+		ReferenceIssuanceID: lock.ReferenceIssuanceID,
+		CreatedAt:           lock.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt:           lock.UpdatedAt.UTC().Format(time.RFC3339),
+		ReleasedAt:          timestampRFC3339(lock.ReleasedAt),
 	}
 }
 
-func serializeOrderCashReservations(reservations []domain.OrderCashReservation) []map[string]any {
-	rows := make([]map[string]any, 0, len(reservations))
+func serializeOrderCashReservations(reservations []domain.OrderCashReservation) []orderCashReservationResponse {
+	rows := make([]orderCashReservationResponse, 0, len(reservations))
 	for _, reservation := range reservations {
-		rows = append(rows, serializeOrderCashReservation(&reservation))
+		rows = append(rows, *serializeOrderCashReservation(&reservation))
 	}
-
 	return rows
 }
 
-func serializeOrderCashReservation(reservation *domain.OrderCashReservation) map[string]any {
+func serializeOrderCashReservation(reservation *domain.OrderCashReservation) *orderCashReservationResponse {
 	if reservation == nil {
 		return nil
 	}
-
-	return map[string]any{
-		"id":             reservation.ID,
-		"user_id":        reservation.UserID,
-		"contract_id":    reservation.ContractID,
-		"currency":       reservation.Currency,
-		"amount_cents":   reservation.AmountCents,
-		"status":         reservation.Status,
-		"reference_type": reservation.ReferenceType,
-		"reference_id":   reservation.ReferenceID,
-		"correlation_id": blankToNil(reservation.CorrelationID),
-		"description":    blankToNil(reservation.Description),
-		"created_at":     reservation.CreatedAt.UTC().Format(time.RFC3339),
-		"updated_at":     reservation.UpdatedAt.UTC().Format(time.RFC3339),
-		"released_at":    timestampRFC3339(reservation.ReleasedAt),
+	return &orderCashReservationResponse{
+		ID:            reservation.ID,
+		UserID:        reservation.UserID,
+		ContractID:    reservation.ContractID,
+		Currency:      reservation.Currency,
+		AmountCents:   reservation.AmountCents,
+		Status:        string(reservation.Status),
+		ReferenceType: reservation.ReferenceType,
+		ReferenceID:   reservation.ReferenceID,
+		CorrelationID: stringOrNil(reservation.CorrelationID),
+		Description:   stringOrNil(reservation.Description),
+		CreatedAt:     reservation.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt:     reservation.UpdatedAt.UTC().Format(time.RFC3339),
+		ReleasedAt:    timestampRFC3339(reservation.ReleasedAt),
 	}
 }
 
-func serializeIssuanceBatches(batches []domain.IssuanceBatch) []map[string]any {
-	rows := make([]map[string]any, 0, len(batches))
+func serializeIssuanceBatches(batches []domain.IssuanceBatch) []issuanceBatchResponse {
+	rows := make([]issuanceBatchResponse, 0, len(batches))
 	for _, batch := range batches {
-		rows = append(rows, serializeIssuanceBatch(&batch))
+		rows = append(rows, *serializeIssuanceBatch(&batch))
 	}
-
 	return rows
 }
 
-func serializeIssuanceBatch(batch *domain.IssuanceBatch) map[string]any {
+func serializeIssuanceBatch(batch *domain.IssuanceBatch) *issuanceBatchResponse {
 	if batch == nil {
 		return nil
 	}
-
-	return map[string]any{
-		"id":                 batch.ID,
-		"contract_id":        batch.ContractID,
-		"creator_user_id":    batch.CreatorUserID,
-		"collateral_lock_id": batch.CollateralLockID,
-		"above_quantity":     batch.AboveQuantity,
-		"below_quantity":     batch.BelowQuantity,
-		"status":             batch.Status,
-		"created_at":         batch.CreatedAt.UTC().Format(time.RFC3339),
-		"updated_at":         batch.UpdatedAt.UTC().Format(time.RFC3339),
+	return &issuanceBatchResponse{
+		ID:               batch.ID,
+		ContractID:       batch.ContractID,
+		CreatorUserID:    batch.CreatorUserID,
+		CollateralLockID: batch.CollateralLockID,
+		AboveQuantity:    batch.AboveQuantity,
+		BelowQuantity:    batch.BelowQuantity,
+		Status:           string(batch.Status),
+		CreatedAt:        batch.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt:        batch.UpdatedAt.UTC().Format(time.RFC3339),
 	}
 }
 
-func serializePositions(positions []*domain.Position) []map[string]any {
-	rows := make([]map[string]any, 0, len(positions))
+func serializePositions(positions []*domain.Position) []positionResponse {
+	rows := make([]positionResponse, 0, len(positions))
 	for _, position := range positions {
-		rows = append(rows, serializePosition(position))
+		rows = append(rows, *serializePosition(position))
 	}
-
 	return rows
 }
 
-func serializePosition(position *domain.Position) map[string]any {
+func serializePosition(position *domain.Position) *positionResponse {
 	if position == nil {
 		return nil
 	}
-
-	return map[string]any{
-		"id":                 position.ID,
-		"user_id":            position.UserID,
-		"contract_id":        position.ContractID,
-		"side":               position.Side,
-		"available_quantity": position.AvailableQuantity,
-		"locked_quantity":    position.LockedQuantity,
-		"total_quantity":     position.TotalQuantity,
-		"updated_at":         position.UpdatedAt.UTC().Format(time.RFC3339),
+	return &positionResponse{
+		ID:                position.ID,
+		UserID:            position.UserID,
+		ContractID:        position.ContractID,
+		Side:              string(position.Side),
+		AvailableQuantity: position.AvailableQuantity,
+		LockedQuantity:    position.LockedQuantity,
+		TotalQuantity:     position.TotalQuantity,
+		UpdatedAt:         position.UpdatedAt.UTC().Format(time.RFC3339),
 	}
 }
 
-func serializePositionsFromValues(positions []domain.Position) []map[string]any {
-	rows := make([]map[string]any, 0, len(positions))
+func serializePositionsFromValues(positions []domain.Position) []positionResponse {
+	rows := make([]positionResponse, 0, len(positions))
 	for _, position := range positions {
 		positionCopy := position
-		rows = append(rows, serializePosition(&positionCopy))
+		rows = append(rows, *serializePosition(&positionCopy))
 	}
-
 	return rows
 }
 
-func serializePositionLocks(locks []domain.PositionLock) []map[string]any {
-	rows := make([]map[string]any, 0, len(locks))
+func serializePositionLocks(locks []domain.PositionLock) []positionLockResponse {
+	rows := make([]positionLockResponse, 0, len(locks))
 	for _, lock := range locks {
 		lockCopy := lock
-		rows = append(rows, serializePositionLock(&lockCopy))
+		rows = append(rows, *serializePositionLock(&lockCopy))
 	}
-
 	return rows
 }
 
-func serializePositionLock(lock *domain.PositionLock) map[string]any {
+func serializePositionLock(lock *domain.PositionLock) *positionLockResponse {
 	if lock == nil {
 		return nil
 	}
-
-	return map[string]any{
-		"id":             lock.ID,
-		"user_id":        lock.UserID,
-		"contract_id":    lock.ContractID,
-		"side":           lock.Side,
-		"quantity":       lock.Quantity,
-		"status":         lock.Status,
-		"order_id":       lock.OrderID,
-		"reference_type": blankToNil(lock.ReferenceType),
-		"reference_id":   blankToNil(lock.ReferenceID),
-		"correlation_id": blankToNil(lock.CorrelationID),
-		"description":    blankToNil(lock.Description),
-		"created_at":     lock.CreatedAt.UTC().Format(time.RFC3339),
-		"updated_at":     lock.UpdatedAt.UTC().Format(time.RFC3339),
-		"released_at":    timestampRFC3339(lock.ReleasedAt),
+	return &positionLockResponse{
+		ID:            lock.ID,
+		UserID:        lock.UserID,
+		ContractID:    lock.ContractID,
+		Side:          string(lock.Side),
+		Quantity:      lock.Quantity,
+		Status:        string(lock.Status),
+		OrderID:       lock.OrderID,
+		ReferenceType: stringOrNil(lock.ReferenceType),
+		ReferenceID:   stringOrNil(lock.ReferenceID),
+		CorrelationID: stringOrNil(lock.CorrelationID),
+		Description:   stringOrNil(lock.Description),
+		CreatedAt:     lock.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt:     lock.UpdatedAt.UTC().Format(time.RFC3339),
+		ReleasedAt:    timestampRFC3339(lock.ReleasedAt),
 	}
 }
 
-func dateString(value *time.Time) any {
+func dateString(value *time.Time) *string {
 	if value == nil {
 		return nil
 	}
-
-	return value.UTC().Format("2006-01-02")
+	formatted := value.UTC().Format("2006-01-02")
+	return &formatted
 }
 
-func timestampRFC3339(value *time.Time) any {
+func timestampRFC3339(value *time.Time) *string {
 	if value == nil {
 		return nil
 	}
-
-	return value.UTC().Format(time.RFC3339)
+	formatted := value.UTC().Format(time.RFC3339)
+	return &formatted
 }
 
-func blankToNil(value string) any {
+func stringOrNil(value string) *string {
 	if value == "" {
 		return nil
 	}
+	copy := value
+	return &copy
+}
 
-	return value
+func ptrLedgerEntryResponse(entry ledgerEntryResponse) *ledgerEntryResponse {
+	return &entry
 }

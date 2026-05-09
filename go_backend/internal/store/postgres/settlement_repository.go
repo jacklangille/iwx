@@ -179,6 +179,25 @@ func (r *ContractRepository) ReplaceUserSettlementEntriesProjection(ctx context.
 
 func (r *ContractRepository) SettleContract(ctx context.Context, input store.SettleContractInput) (*store.SettlementResult, error) {
 	return withTransaction(ctx, r.db, func(tx *sql.Tx) (*store.SettlementResult, error) {
+		eventID := strings.TrimSpace(input.EventID)
+		if eventID != "" {
+			applied, err := settlementApplicationExistsTx(ctx, tx, eventID)
+			if err != nil {
+				return nil, err
+			}
+			if applied {
+				contract, err := getContractForUpdateTx(ctx, tx, input.ContractID)
+				if err != nil {
+					return nil, err
+				}
+				entries, err := listSettlementEntriesByContractTx(ctx, tx, input.ContractID, 500)
+				if err != nil {
+					return nil, err
+				}
+				return &store.SettlementResult{Contract: contract, Entries: entries, AffectedUsers: uniqueSettlementUsers(entries), SettledAt: settlementTimeOrNow(entries)}, nil
+			}
+		}
+
 		contract, err := getContractForUpdateTx(ctx, tx, input.ContractID)
 		if err != nil {
 			return nil, err
@@ -190,6 +209,11 @@ func (r *ContractRepository) SettleContract(ctx context.Context, input store.Set
 			entries, err := listSettlementEntriesByContractTx(ctx, tx, input.ContractID, 500)
 			if err != nil {
 				return nil, err
+			}
+			if eventID != "" {
+				if err := recordSettlementApplicationTx(ctx, tx, eventID, input.ContractID, input.CorrelationID, settlementTimeOrNow(entries)); err != nil {
+					return nil, err
+				}
 			}
 			return &store.SettlementResult{Contract: contract, Entries: entries, AffectedUsers: uniqueSettlementUsers(entries), SettledAt: settlementTimeOrNow(entries)}, nil
 		}
@@ -378,11 +402,38 @@ func (r *ContractRepository) SettleContract(ctx context.Context, input store.Set
 		if err != nil {
 			return nil, err
 		}
+		if eventID != "" {
+			if err := recordSettlementApplicationTx(ctx, tx, eventID, input.ContractID, input.CorrelationID, settlementTime); err != nil {
+				return nil, err
+			}
+		}
 		result.Contract = updatedContract
 		result.AffectedUsers = uniqueInt64s(result.AffectedUsers)
 
 		return result, nil
 	})
+}
+
+func settlementApplicationExistsTx(ctx context.Context, tx *sql.Tx, eventID string) (bool, error) {
+	var exists bool
+	err := tx.QueryRowContext(ctx, `
+		SELECT EXISTS(SELECT 1 FROM settlement_applications WHERE resolution_event_id = $1)
+	`, eventID).Scan(&exists)
+	return exists, err
+}
+
+func recordSettlementApplicationTx(ctx context.Context, tx *sql.Tx, eventID string, contractID int64, correlationID string, settledAt time.Time) error {
+	_, err := tx.ExecContext(ctx, `
+		INSERT INTO settlement_applications (
+			resolution_event_id,
+			contract_id,
+			correlation_id,
+			settled_at
+		)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (resolution_event_id) DO NOTHING
+	`, eventID, contractID, nullableTrimmedString(correlationID), settledAt.UTC())
+	return err
 }
 
 type settlementEntryInput struct {
@@ -749,7 +800,8 @@ func updateContractStatusTx(ctx context.Context, tx *sql.Tx, contractID int64, s
 			data_provider_name,
 			station_id,
 			data_provider_station_mode,
-			description
+			description,
+			updated_at
 	`, contractID, status)
 
 	contract, err := scanContract(row)

@@ -15,7 +15,5 @@ func (s *Server) handleStationsIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
-		"stations": serializeStations(stations),
-	})
+	writeJSON(w, http.StatusOK, stationsResponse{Stations: serializeStations(stations)})
 }

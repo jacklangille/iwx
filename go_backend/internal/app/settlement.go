@@ -5,10 +5,9 @@ import (
 	"log"
 
 	"iwx/go_backend/internal/config"
+	"iwx/go_backend/internal/exchangecorehttpclient"
 	"iwx/go_backend/internal/messaging/natsbus"
-	"iwx/go_backend/internal/readprojection"
 	"iwx/go_backend/internal/settlement"
-	"iwx/go_backend/internal/store/postgres"
 )
 
 func RunSettlementService() error {
@@ -17,32 +16,11 @@ func RunSettlementService() error {
 	if err := cfg.ValidateForSettlement(); err != nil {
 		return err
 	}
-	log.Printf("settlement config loaded exchange_core_db=%s read_db=%s nats=%s instance=%s", cfg.ExchangeCoreDatabaseURL, cfg.ReadDatabaseURL, cfg.NATSURL, cfg.SettlementInstanceID)
+	log.Printf("settlement config loaded exchange_core_service=%s nats=%s instance=%s", cfg.ExchangeCoreServiceURL, cfg.NATSURL, cfg.SettlementInstanceID)
 
-	if err := runStartupMigrations(context.Background(), "settlement", cfg, "exchange-core", "read"); err != nil {
+	if err := runStartupMigrations(context.Background(), "settlement", cfg); err != nil {
 		return err
 	}
-
-	repo := postgres.NewContractRepository(cfg.ExchangeCoreDatabaseURL)
-	readRepo := postgres.NewContractRepository(cfg.ReadDatabaseURL)
-	projector := readprojection.NewProjector(
-		repo,
-		readRepo,
-		repo,
-		readRepo,
-		nil,
-		nil,
-		repo,
-		readRepo,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-	)
 
 	publisher, err := natsbus.NewSettlementPublisher(cfg)
 	if err != nil {
@@ -50,7 +28,8 @@ func RunSettlementService() error {
 	}
 	defer publisher.Close()
 
-	service := settlement.NewService(repo, projector, publisher)
+	settler := exchangecorehttpclient.NewClient(cfg.ExchangeCoreServiceURL)
+	service := settlement.NewService(settler, publisher)
 	consumer, err := natsbus.NewSettlementConsumer(cfg, service)
 	if err != nil {
 		return err

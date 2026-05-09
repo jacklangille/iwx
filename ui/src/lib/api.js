@@ -5,6 +5,12 @@ const AUTH_API_BASE_URL =
 const EXCHANGE_CORE_API_BASE_URL =
   import.meta.env.VITE_EXCHANGE_CORE_API_BASE_URL || "/exchange-core-api";
 
+let unauthorizedHandler = null;
+
+export function setUnauthorizedHandler(handler) {
+  unauthorizedHandler = typeof handler === "function" ? handler : null;
+}
+
 async function requestJson(baseUrl, path, options = {}) {
   const headers = new Headers(options.headers || {});
 
@@ -23,6 +29,10 @@ async function requestJson(baseUrl, path, options = {}) {
     : await response.text();
 
   if (!response.ok) {
+    if (response.status === 401 && unauthorizedHandler) {
+      unauthorizedHandler();
+    }
+
     const error = new Error(
       typeof payload === "string"
         ? payload
@@ -108,7 +118,7 @@ export function submitOrder(token, body) {
 }
 
 export function getOrderCommand(token, commandId) {
-  return requestJson(EXCHANGE_CORE_API_BASE_URL, `/api/order_commands/${commandId}`, {
+  return requestJson(READ_API_BASE_URL, `/api/order_commands/${commandId}`, {
     headers: authHeaders(token),
   });
 }
@@ -202,10 +212,6 @@ export function signup(username, password) {
     method: "POST",
     body: JSON.stringify({ username, password }),
   });
-}
-
-export function contractMarketStreamUrl(contractId) {
-  return `${READ_API_BASE_URL}/api/stream/contracts/${contractId}/market`;
 }
 
 export { EXCHANGE_CORE_API_BASE_URL };

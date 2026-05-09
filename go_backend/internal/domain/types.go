@@ -20,6 +20,7 @@ type Contract struct {
 	StationID               string
 	DataProviderStationMode string
 	Description             string
+	UpdatedAt               time.Time
 }
 
 type Order struct {

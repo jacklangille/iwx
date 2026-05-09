@@ -1,13 +1,15 @@
 package oraclehttp
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
+	"iwx/go_backend/internal/httpjson"
 	"iwx/go_backend/internal/oracle"
+	"iwx/go_backend/internal/projectionbundle"
 	"iwx/go_backend/internal/store"
 	"iwx/go_backend/pkg/logging"
 )
@@ -21,7 +23,7 @@ func (s *Server) handleStations(w http.ResponseWriter, r *http.Request) {
 			writeInternalError(w, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"stations": serializeStations(stations)})
+		writeJSON(w, http.StatusOK, stationsResponse{Stations: serializeStations(stations)})
 	case http.MethodPost:
 		var request struct {
 			ProviderName     string   `json:"provider_name"`
@@ -33,7 +35,7 @@ func (s *Server) handleStations(w http.ResponseWriter, r *http.Request) {
 			SupportedMetrics []string `json:"supported_metrics"`
 			Active           *bool    `json:"active"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		if err := httpjson.DecodeStrict(r.Body, &request); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid json body"})
 			return
 		}
@@ -75,6 +77,43 @@ func (s *Server) handleObservations(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (s *Server) handleInternalStationLookup(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		methodNotAllowed(w, "GET")
+		return
+	}
+
+	path := strings.TrimPrefix(r.URL.Path, "/internal/stations/")
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	if len(parts) != 2 {
+		http.NotFound(w, r)
+		return
+	}
+
+	providerName, err := url.PathUnescape(parts[0])
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid provider name"})
+		return
+	}
+	stationID, err := url.PathUnescape(parts[1])
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid station id"})
+		return
+	}
+
+	station, err := s.service.FindStation(r.Context(), providerName, stationID)
+	if err != nil {
+		writeInternalError(w, err)
+		return
+	}
+	if station == nil {
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": "station not found"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, serializeStation(*station))
+}
+
 func (s *Server) handleContractSubroutes(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/api/oracle/contracts/")
 	parts := strings.Split(strings.Trim(path, "/"), "/")
@@ -108,6 +147,50 @@ func (s *Server) handleContractSubroutes(w http.ResponseWriter, r *http.Request)
 			return
 		}
 		s.handleResolutionShow(w, r, contractID)
+	default:
+		http.NotFound(w, r)
+	}
+}
+
+func (s *Server) handleInternalProjection(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		methodNotAllowed(w, "GET")
+		return
+	}
+
+	path := strings.TrimPrefix(r.URL.Path, "/internal/projection/")
+	path = strings.Trim(path, "/")
+	parts := strings.Split(path, "/")
+
+	switch {
+	case len(parts) == 1 && parts[0] == "stations":
+		stations, err := s.service.ListStations(r.Context(), false)
+		if err != nil {
+			writeInternalError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, projectionbundle.StationCatalogBundle{Stations: stations})
+	case len(parts) == 3 && parts[0] == "contracts" && parts[2] == "oracle":
+		contractID, err := strconv.ParseInt(parts[1], 10, 64)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid contract id"})
+			return
+		}
+		observations, err := s.service.ListObservations(r.Context(), contractID, 500)
+		if err != nil {
+			writeInternalError(w, err)
+			return
+		}
+		resolution, err := s.service.GetLatestResolution(r.Context(), contractID)
+		if err != nil {
+			writeInternalError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, projectionbundle.OracleStateBundle{
+			ContractID:   contractID,
+			Observations: observations,
+			Resolution:   resolution,
+		})
 	default:
 		http.NotFound(w, r)
 	}
@@ -156,9 +239,9 @@ func (s *Server) handleObservationIndex(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
-		"contract_id":  contractID,
-		"observations": serializeObservations(observations),
+	writeJSON(w, http.StatusOK, observationsResponse{
+		ContractID:   contractID,
+		Observations: serializeObservations(observations),
 	})
 }
 

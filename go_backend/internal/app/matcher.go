@@ -2,12 +2,17 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"log"
+	"time"
 
 	"iwx/go_backend/internal/config"
+	"iwx/go_backend/internal/events"
+	"iwx/go_backend/internal/matcherhttp"
 	"iwx/go_backend/internal/matching"
 	"iwx/go_backend/internal/messaging/natsbus"
-	"iwx/go_backend/internal/readprojection"
+	"iwx/go_backend/internal/outbox"
+	"iwx/go_backend/internal/projectionchange"
 	"iwx/go_backend/internal/store/postgres"
 )
 
@@ -18,53 +23,38 @@ func RunMatcherService() error {
 		return err
 	}
 	log.Printf(
-		"matcher config loaded nats=%s db=%s read_db=%s instance=%s partitions=%v",
+		"matcher config loaded nats=%s db=%s instance=%s partitions=%v",
 		cfg.NATSURL,
 		cfg.MatcherDatabaseURL,
-		cfg.ReadDatabaseURL,
 		cfg.MatcherInstanceID,
 		cfg.MatcherOwnedPartitions,
 	)
 
-	if err := runStartupMigrations(context.Background(), "matcher", cfg, "matcher", "read"); err != nil {
+	if err := runStartupMigrations(context.Background(), "matcher", cfg, "matcher"); err != nil {
 		return err
 	}
 
 	matchingRepo := postgres.NewMatchingRepository(cfg.MatcherDatabaseURL)
+	orderRepo := postgres.NewOrderRepository(cfg.MatcherDatabaseURL)
+	executionRepo := postgres.NewExecutionRepository(cfg.MatcherDatabaseURL)
+	snapshotRepo := postgres.NewSnapshotRepository(cfg.MatcherDatabaseURL)
+	outboxRepo := postgres.NewOutboxRepository(cfg.MatcherDatabaseURL)
 	service := matching.NewService(matchingRepo)
-	sourceOrderRepo := postgres.NewOrderRepository(cfg.MatcherDatabaseURL)
-	sourceExecutionRepo := postgres.NewExecutionRepository(cfg.MatcherDatabaseURL)
-	sourceSnapshotRepo := postgres.NewSnapshotRepository(cfg.MatcherDatabaseURL)
-	readOrderRepo := postgres.NewOrderRepository(cfg.ReadDatabaseURL)
-	readExecutionRepo := postgres.NewExecutionRepository(cfg.ReadDatabaseURL)
-	readSnapshotRepo := postgres.NewSnapshotRepository(cfg.ReadDatabaseURL)
-	readCommandRepo := postgres.NewMatchingRepository(cfg.ReadDatabaseURL)
-	projector := readprojection.NewProjector(
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		sourceOrderRepo,
-		readOrderRepo,
-		sourceExecutionRepo,
-		readExecutionRepo,
-		sourceSnapshotRepo,
-		readSnapshotRepo,
-		matchingRepo,
-		readCommandRepo,
-	)
-	handler := matching.NewProjectingHandler(service, projector)
-
 	publisher, err := natsbus.NewExecutionPublisher(cfg)
 	if err != nil {
 		return err
 	}
 	defer publisher.Close()
-	handler = matching.NewExecutionEventPublishingHandler(handler, publisher)
+
+	changeBusPublisher, err := natsbus.NewProjectionChangePublisher(cfg)
+	if err != nil {
+		return err
+	}
+	defer changeBusPublisher.Close()
+
+	emitter := projectionchange.NewEmitter(outbox.NewProjectionChangePublisher(outboxRepo))
+	handler := matching.NewProjectionChangePublishingHandler(service, emitter, matchingRepo)
+	handler = matching.NewExecutionEventPublishingHandler(handler, outbox.NewExecutionCreatedPublisher(outboxRepo))
 
 	consumer, err := natsbus.NewMatcherConsumer(cfg, handler)
 	if err != nil {
@@ -73,6 +63,37 @@ func RunMatcherService() error {
 	defer func() {
 		log.Printf("matcher shutting down nats consumer")
 		consumer.Close()
+	}()
+
+	dispatcher := outbox.NewDispatcher(outboxRepo, 500*time.Millisecond, func(ctx context.Context, pending outbox.Event) error {
+		switch pending.EventType {
+		case outbox.EventTypeExecutionCreated:
+			var event events.ExecutionCreated
+			if err := json.Unmarshal(pending.Payload, &event); err != nil {
+				return err
+			}
+			return publisher.PublishExecutionCreated(ctx, event)
+		case outbox.EventTypeProjectionChange:
+			var event events.ProjectionChange
+			if err := json.Unmarshal(pending.Payload, &event); err != nil {
+				return err
+			}
+			return changeBusPublisher.PublishProjectionChange(ctx, event)
+		default:
+			return nil
+		}
+	})
+	go func() {
+		if err := dispatcher.Run(context.Background()); err != nil {
+			log.Printf("matcher outbox dispatcher stopped err=%v", err)
+		}
+	}()
+
+	httpServer := matcherhttp.NewServer(cfg, orderRepo, executionRepo, snapshotRepo, matchingRepo)
+	go func() {
+		if err := httpServer.ListenAndServe(); err != nil {
+			log.Printf("matcher http server stopped err=%v", err)
+		}
 	}()
 
 	log.Printf("matcher service ready instance=%s", cfg.MatcherInstanceID)

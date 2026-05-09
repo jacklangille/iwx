@@ -23,6 +23,7 @@ func scanContract(rows scanner) (domain.Contract, error) {
 	var dataProviderStationMode sql.NullString
 	var description sql.NullString
 	var measurementUnit sql.NullString
+	var updatedAt sql.NullTime
 
 	err := rows.Scan(
 		&contract.ID,
@@ -42,6 +43,7 @@ func scanContract(rows scanner) (domain.Contract, error) {
 		&stationID,
 		&dataProviderStationMode,
 		&description,
+		&updatedAt,
 	)
 	if err != nil {
 		return domain.Contract{}, err
@@ -59,6 +61,7 @@ func scanContract(rows scanner) (domain.Contract, error) {
 	contract.StationID = stationID.String
 	contract.DataProviderStationMode = dataProviderStationMode.String
 	contract.Description = description.String
+	contract.UpdatedAt = zeroableTime(updatedAt)
 
 	return contract, nil
 }
@@ -310,6 +313,7 @@ func scanExecution(rows scanner) (domain.Execution, error) {
 	err := rows.Scan(
 		&execution.ID,
 		&execution.ExecutionID,
+		&execution.CommandID,
 		&execution.ContractID,
 		&execution.TokenType,
 		&execution.BuyOrderID,
@@ -404,9 +408,11 @@ func scanWeatherStation(rows scanner) (domain.WeatherStation, error) {
 
 func scanContractResolution(rows scanner) (domain.ContractResolution, error) {
 	var resolution domain.ContractResolution
+	var publishedAt sql.NullTime
 
 	err := rows.Scan(
 		&resolution.ID,
+		&resolution.EventID,
 		&resolution.ContractID,
 		&resolution.ProviderName,
 		&resolution.StationID,
@@ -417,6 +423,7 @@ func scanContractResolution(rows scanner) (domain.ContractResolution, error) {
 		&resolution.ResolvedValue,
 		&resolution.Outcome,
 		&resolution.ResolvedAt,
+		&publishedAt,
 	)
 	if err != nil {
 		return domain.ContractResolution{}, err
@@ -425,6 +432,7 @@ func scanContractResolution(rows scanner) (domain.ContractResolution, error) {
 	resolution.ObservationWindowStart = resolution.ObservationWindowStart.UTC()
 	resolution.ObservationWindowEnd = resolution.ObservationWindowEnd.UTC()
 	resolution.ResolvedAt = resolution.ResolvedAt.UTC()
+	resolution.PublishedAt = nullableTime(publishedAt)
 	return resolution, nil
 }
 
@@ -588,4 +596,18 @@ func nullableTime(value sql.NullTime) *time.Time {
 
 	copy := value.Time.UTC()
 	return &copy
+}
+
+func zeroableTime(value sql.NullTime) time.Time {
+	if !value.Valid {
+		return time.Time{}
+	}
+	return value.Time.UTC()
+}
+
+func nullIfZeroTime(value time.Time) any {
+	if value.IsZero() {
+		return nil
+	}
+	return value.UTC()
 }

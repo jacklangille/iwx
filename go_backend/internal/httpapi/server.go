@@ -8,37 +8,25 @@ import (
 	"time"
 
 	"iwx/go_backend/internal/config"
-	"iwx/go_backend/internal/exchangecore"
-	"iwx/go_backend/internal/matching"
 	"iwx/go_backend/internal/readmodel"
-	"iwx/go_backend/internal/realtime"
 	"iwx/go_backend/internal/requestctx"
 	"iwx/go_backend/pkg/logging"
 )
 
 type Server struct {
-	config       config.Config
-	reads        *readmodel.Service
-	exchangeCore *exchangecore.Service
-	hub          *realtime.Hub
-	matcher      matching.CommandClient
-	mux          *http.ServeMux
+	config config.Config
+	reads  *readmodel.Service
+	mux    *http.ServeMux
 }
 
 func NewServer(
 	cfg config.Config,
 	reads *readmodel.Service,
-	exchangeCore *exchangecore.Service,
-	hub *realtime.Hub,
-	matcher matching.CommandClient,
 ) *Server {
 	server := &Server{
-		config:       cfg,
-		reads:        reads,
-		exchangeCore: exchangeCore,
-		hub:          hub,
-		matcher:      matcher,
-		mux:          http.NewServeMux(),
+		config: cfg,
+		reads:  reads,
+		mux:    http.NewServeMux(),
 	}
 
 	server.registerRoutes()
@@ -70,7 +58,6 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/api/me/cash_reservations", s.handleMeCashReservations)
 	s.mux.HandleFunc("/api/me/portfolio", s.handleMePortfolio)
 	s.mux.HandleFunc("/api/me/settlements", s.handleMeSettlements)
-	s.mux.HandleFunc("/api/stream/", s.handleStreams)
 }
 
 func (s *Server) handleIndex(w http.ResponseWriter, _ *http.Request) {
