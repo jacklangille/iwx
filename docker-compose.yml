@@ -1,0 +1,286 @@
+x-go-service: &go-service
+  image: golang:1.25-bookworm
+  working_dir: /app
+  volumes:
+    - ./go_backend:/app
+  restart: unless-stopped
+
+x-backend-env: &backend-env
+  IWX_NATS_URL: nats://nats:4222
+  IWX_NATS_STREAM_PLACE_ORDER: IWX_PLACE_ORDER
+  IWX_NATS_STREAM_EXECUTION_CREATED: IWX_EXECUTION_CREATED
+  IWX_NATS_STREAM_CONTRACT_RESOLVED: IWX_CONTRACT_RESOLVED
+  IWX_NATS_STREAM_SETTLEMENT_COMPLETED: IWX_SETTLEMENT_COMPLETED
+  IWX_NATS_SUBJECT_PLACE_ORDER: iwx.matcher.place_order
+  IWX_NATS_SUBJECT_EXECUTION_CREATED: iwx.matcher.execution_created
+  IWX_NATS_SUBJECT_CONTRACT_RESOLVED: iwx.oracle.contract_resolved
+  IWX_NATS_SUBJECT_SETTLEMENT_COMPLETED: iwx.settlement.completed
+  IWX_AUTH_JWT_SECRET: replace-with-a-long-random-secret
+  IWX_AUTH_JWT_ISSUER: iwx-go-api
+  IWX_AUTH_JWT_TTL_SECONDS: "3600"
+
+services:
+  auth-postgres:
+    image: postgres:16
+    container_name: iwx-auth-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: auth_app
+      POSTGRES_PASSWORD: auth_app
+      POSTGRES_DB: auth
+    ports:
+      - "5436:5432"
+    volumes:
+      - auth_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auth_app -d auth"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  exchange-core-postgres:
+    image: postgres:16
+    container_name: iwx-exchange-core-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: exchange_core_app
+      POSTGRES_PASSWORD: exchange_core_app
+      POSTGRES_DB: exchange_core
+    ports:
+      - "5437:5432"
+    volumes:
+      - exchange_core_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U exchange_core_app -d exchange_core"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  oracle-postgres:
+    image: postgres:16
+    container_name: iwx-oracle-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: oracle_app
+      POSTGRES_PASSWORD: oracle_app
+      POSTGRES_DB: oracle
+    ports:
+      - "5438:5432"
+    volumes:
+      - oracle_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oracle_app -d oracle"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  read-postgres:
+    image: postgres:16
+    container_name: iwx-read-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: read_app
+      POSTGRES_PASSWORD: read_app
+      POSTGRES_DB: read
+    ports:
+      - "5433:5432"
+    volumes:
+      - read_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U read_app -d read"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  matcher-postgres-0:
+    image: bitnamilegacy/postgresql-repmgr:17.6.0
+    container_name: iwx-matcher-postgres-0
+    restart: unless-stopped
+    environment:
+      POSTGRESQL_POSTGRES_PASSWORD: postgres
+      POSTGRESQL_USERNAME: matcher_app
+      POSTGRESQL_PASSWORD: matcher_app
+      POSTGRESQL_DATABASE: matcher
+      REPMGR_PASSWORD: repmgr
+      REPMGR_PRIMARY_HOST: matcher-postgres-0
+      REPMGR_PARTNER_NODES: matcher-postgres-0,matcher-postgres-1
+      REPMGR_NODE_NAME: matcher-postgres-0
+      REPMGR_NODE_NETWORK_NAME: matcher-postgres-0
+      REPMGR_NODE_ID: 1000
+    ports:
+      - "5434:5432"
+    volumes:
+      - matcher_primary_data:/bitnami/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U matcher_app -d matcher"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  matcher-postgres-1:
+    image: bitnamilegacy/postgresql-repmgr:17.6.0
+    container_name: iwx-matcher-postgres-1
+    restart: unless-stopped
+    depends_on:
+      matcher-postgres-0:
+        condition: service_healthy
+    environment:
+      POSTGRESQL_POSTGRES_PASSWORD: postgres
+      POSTGRESQL_USERNAME: matcher_app
+      POSTGRESQL_PASSWORD: matcher_app
+      POSTGRESQL_DATABASE: matcher
+      REPMGR_PASSWORD: repmgr
+      REPMGR_PRIMARY_HOST: matcher-postgres-0
+      REPMGR_PARTNER_NODES: matcher-postgres-0,matcher-postgres-1
+      REPMGR_NODE_NAME: matcher-postgres-1
+      REPMGR_NODE_NETWORK_NAME: matcher-postgres-1
+      REPMGR_NODE_ID: 1001
+    ports:
+      - "5435:5432"
+    volumes:
+      - matcher_replica_data:/bitnami/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U matcher_app -d matcher"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  nats:
+    image: nats:2.11-alpine
+    container_name: iwx-nats
+    restart: unless-stopped
+    command: ["-js"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    volumes:
+      - nats_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 4222 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  auth:
+    <<: *go-service
+    container_name: iwx-auth
+    command: ["go", "run", "./cmd/auth"]
+    environment:
+      <<: *backend-env
+      IWX_AUTH_HTTP_ADDR: :8081
+      IWX_AUTH_DATABASE_URL: postgres://auth_app:auth_app@auth-postgres:5432/auth?sslmode=disable
+      IWX_AUTH_BOOTSTRAP_USERNAME: admin
+      IWX_AUTH_BOOTSTRAP_PASSWORD: change-me
+    depends_on:
+      auth-postgres:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+
+  exchange-core:
+    <<: *go-service
+    container_name: iwx-exchange-core
+    command: ["go", "run", "./cmd/exchange-core"]
+    environment:
+      <<: *backend-env
+      IWX_EXCHANGE_CORE_HTTP_ADDR: :8082
+      IWX_EXCHANGE_CORE_DATABASE_URL: postgres://exchange_core_app:exchange_core_app@exchange-core-postgres:5432/exchange_core?sslmode=disable
+      IWX_READ_DATABASE_URL: postgres://read_app:read_app@read-postgres:5432/read?sslmode=disable
+    depends_on:
+      exchange-core-postgres:
+        condition: service_healthy
+      read-postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    ports:
+      - "8082:8082"
+
+  read-api:
+    <<: *go-service
+    container_name: iwx-read-api
+    command: ["go", "run", "./cmd/read-api"]
+    environment:
+      <<: *backend-env
+      IWX_HTTP_ADDR: :8080
+      IWX_READ_DATABASE_URL: postgres://read_app:read_app@read-postgres:5432/read?sslmode=disable
+      IWX_EXCHANGE_CORE_DATABASE_URL: postgres://exchange_core_app:exchange_core_app@exchange-core-postgres:5432/exchange_core?sslmode=disable
+      IWX_MATCHER_DATABASE_URL: postgres://matcher_app:matcher_app@matcher-postgres-0:5432/matcher?sslmode=disable
+    depends_on:
+      read-postgres:
+        condition: service_healthy
+      exchange-core-postgres:
+        condition: service_healthy
+      matcher-postgres-0:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+
+  matcher:
+    <<: *go-service
+    container_name: iwx-matcher
+    command: ["go", "run", "./cmd/matcher"]
+    environment:
+      <<: *backend-env
+      IWX_MATCHER_DATABASE_URL: postgres://matcher_app:matcher_app@matcher-postgres-0:5432/matcher?sslmode=disable
+      IWX_READ_DATABASE_URL: postgres://read_app:read_app@read-postgres:5432/read?sslmode=disable
+      IWX_MATCHER_PARTITION_COUNT: "16"
+      IWX_MATCHER_OWNED_PARTITIONS: 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
+      IWX_MATCHER_INSTANCE_ID: matcher-compose
+    depends_on:
+      matcher-postgres-0:
+        condition: service_healthy
+      read-postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+
+  oracle:
+    <<: *go-service
+    container_name: iwx-oracle
+    command: ["go", "run", "./cmd/oracle"]
+    environment:
+      <<: *backend-env
+      IWX_ORACLE_HTTP_ADDR: :8083
+      IWX_ORACLE_DATABASE_URL: postgres://oracle_app:oracle_app@oracle-postgres:5432/oracle?sslmode=disable
+      IWX_EXCHANGE_CORE_DATABASE_URL: postgres://exchange_core_app:exchange_core_app@exchange-core-postgres:5432/exchange_core?sslmode=disable
+      IWX_READ_DATABASE_URL: postgres://read_app:read_app@read-postgres:5432/read?sslmode=disable
+    depends_on:
+      oracle-postgres:
+        condition: service_healthy
+      exchange-core-postgres:
+        condition: service_healthy
+      read-postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    ports:
+      - "8083:8083"
+
+  settlement:
+    <<: *go-service
+    container_name: iwx-settlement
+    command: ["go", "run", "./cmd/settlement"]
+    environment:
+      <<: *backend-env
+      IWX_EXCHANGE_CORE_DATABASE_URL: postgres://exchange_core_app:exchange_core_app@exchange-core-postgres:5432/exchange_core?sslmode=disable
+      IWX_READ_DATABASE_URL: postgres://read_app:read_app@read-postgres:5432/read?sslmode=disable
+      IWX_SETTLEMENT_INSTANCE_ID: settlement-compose
+    depends_on:
+      exchange-core-postgres:
+        condition: service_healthy
+      read-postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+
+volumes:
+  auth_postgres_data:
+  exchange_core_postgres_data:
+  oracle_postgres_data:
+  read_postgres_data:
+  matcher_primary_data:
+  matcher_replica_data:
+  nats_data:

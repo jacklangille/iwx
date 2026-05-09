@@ -5,17 +5,9 @@
 *.swp
 *.swo
 
-# Elixir/Phoenix build artifacts and local tooling state
-/_build/
-/deps/
-/.elixir_ls/
-/.fetch
-erl_crash.dump
-*.ez
-
 # Node dependencies and generated assets
-/assets/node_modules/
-/priv/static/assets/
+/ui/node_modules/
+/ui/dist/
 
 # Local environment and runtime files
 .env
@@ -28,5 +20,8 @@ erl_crash.dump
 /cover/
 /coverage/
 
-# Local uploads or generated files
-/priv/static/uploads/
+# Go caches and logs
+.gocache
+.gomodcache
+.gotelemetry
+*.log
